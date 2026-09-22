@@ -1,0 +1,293 @@
+.qr-select-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1rem;
+  margin: 1.5rem 0;
+}
+
+.qr-select-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: .9rem;
+  min-height: 92px;
+  padding: .8rem;
+  border: 2px solid transparent;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 10px 28px rgba(16, 62, 51, .08);
+  cursor: pointer;
+  transition: border-color .18s ease, transform .18s ease, box-shadow .18s ease;
+}
+
+.qr-select-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 14px 34px rgba(16, 62, 51, .13);
+}
+
+.qr-select-card:has(input:checked) {
+  border-color: #14725a;
+  background: #f2fbf7;
+}
+
+.qr-select-check {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 2px solid #8aa39a;
+  border-radius: 7px;
+  color: transparent;
+  font-weight: 900;
+}
+
+.qr-select-card input { position: absolute; opacity: 0; pointer-events: none; }
+.qr-select-card input:checked + .qr-select-check { border-color: #11664f; color: #fff; background: #11664f; }
+
+.qr-select-card img,
+.qr-select-card .machine-photo-placeholder {
+  width: 68px;
+  height: 68px;
+  border-radius: 13px;
+  object-fit: cover;
+}
+
+.qr-select-card strong,
+.qr-select-card small {
+  display: block;
+}
+
+.qr-select-card small {
+  margin-top: .25rem;
+  color: #61736d;
+}
+
+.qr-sticker-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(330px, 480px));
+  justify-content: center;
+  gap: 1.25rem;
+  margin: 1.5rem auto;
+}
+
+.qr-sticker {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto 1fr auto auto;
+  overflow: hidden;
+  min-height: 500px;
+  width: 100%;
+  max-width: 480px;
+  border: 1px solid #d7e2de;
+  border-radius: 24px;
+  background: #fff;
+  box-shadow: 0 16px 38px rgba(16, 62, 51, .12);
+}
+
+.qr-sticker > header {
+  color: #fff;
+  background: linear-gradient(135deg, #0d4d3d, #168166);
+}
+
+.qr-sticker > header > b {
+  display: block;
+  padding: 7px 18px;
+  background: rgba(0, 0, 0, .16);
+  font-size: .72rem;
+  letter-spacing: .14em;
+  text-align: center;
+}
+
+.qr-sticker-brand {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px 18px;
+  color: #fff;
+}
+
+.qr-sticker-brand strong {
+  font-size: .95rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.qr-sticker-brand span {
+  font-size: 1.45rem;
+  opacity: .88;
+}
+
+.qr-sticker-brand small { display: block; margin-top: 2px; font-size: .58rem; letter-spacing: .12em; }
+
+.qr-sticker-machine {
+  display: grid;
+  grid-template-columns: 42% 1fr;
+  gap: 15px;
+  padding: 16px 18px 8px;
+}
+
+.qr-sticker-machine img,
+.qr-sticker-placeholder {
+  width: 100%;
+  height: 150px;
+  border-radius: 16px;
+  object-fit: cover;
+  background: #e8f2ee;
+}
+
+.qr-sticker-placeholder {
+  display: grid;
+  place-items: center;
+  color: #12634e;
+  font-size: 2rem;
+}
+
+.qr-sticker-machine h2 {
+  margin: 0 0 7px;
+  font-size: 1.25rem;
+  line-height: 1.12;
+  color: #0b3027;
+}
+
+.qr-sticker-machine p {
+  margin: 4px 0;
+  color: #50645e;
+  font-size: .82rem;
+}
+
+.qr-sticker-machine span { color: #12634e; font-size: .72rem; font-weight: 800; letter-spacing: .08em; }
+
+.qr-sticker-scan {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 8px 18px 13px;
+}
+
+.qr-sticker-code {
+  display: grid;
+  place-items: center;
+  padding: 8px;
+  border: 2px solid #14725a;
+  border-radius: 14px;
+  background: #fff;
+}
+
+.qr-sticker-code img,
+.qr-sticker-code canvas {
+  display: block;
+  width: 128px !important;
+  height: 128px !important;
+}
+
+.qr-sticker-scan h3 {
+  margin: 0 0 5px;
+  color: #0c3f32;
+  font-size: 1.05rem;
+}
+
+.qr-sticker-scan p {
+  margin: 0;
+  color: #5d6e69;
+  font-size: .78rem;
+  line-height: 1.35;
+}
+
+.qr-sticker-scan span { color: #5d6e69; font-size: .75rem; line-height: 1.3; }
+.qr-sticker-code strong { display: block; margin-top: 4px; color: #12634e; font-size: .62rem; text-align: center; }
+
+.qr-sticker > footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 9px 18px;
+  color: #fff;
+  background: #0c3f32;
+  text-align: center;
+  font-size: .68rem;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+@media (max-width: 520px) {
+  .qr-select-grid,
+  .qr-sticker-grid { grid-template-columns: 1fr; }
+  .qr-sticker-machine { grid-template-columns: 1fr; }
+  .qr-sticker-machine img,
+  .qr-sticker-placeholder { height: 190px; }
+}
+
+@page {
+  size: A4 portrait;
+  margin: 7mm;
+}
+
+@media print {
+  html, body {
+    width: 210mm;
+    background: #fff !important;
+  }
+
+  .topbar,
+  .sidebar,
+  .sidebar-backdrop,
+  .page-heading,
+  .screen-actions,
+  .qr-screen-only,
+  .qr-screen-actions,
+  .toast-region {
+    display: none !important;
+  }
+
+  .app-view,
+  .main-content {
+    display: block !important;
+    width: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .qr-sticker-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr);
+    grid-auto-rows: 136mm;
+    gap: 5mm 4mm;
+    margin: 0;
+    justify-content: stretch;
+  }
+
+  .qr-sticker {
+    min-height: 0;
+    height: 136mm;
+    width: auto;
+    max-width: none;
+    border: .35mm solid #b8cbc4;
+    border-radius: 5mm;
+    box-shadow: none;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
+  }
+
+  .qr-sticker-brand { padding: 3.2mm 4mm; }
+  .qr-sticker > header > b { padding: 1.4mm 4mm; font-size: 6.5pt; }
+  .qr-sticker-brand strong { font-size: 9pt; }
+  .qr-sticker-brand span { font-size: 6.5pt; }
+  .qr-sticker-machine { grid-template-columns: 39% 1fr; gap: 3mm; padding: 3.5mm 4mm 1.5mm; }
+  .qr-sticker-machine img,
+  .qr-sticker-placeholder { height: 38mm; border-radius: 3mm; }
+  .qr-sticker-machine h2 { font-size: 12pt; }
+  .qr-sticker-machine p { font-size: 7.5pt; margin: 1mm 0; }
+  .qr-sticker-machine span { font-size: 6.5pt; }
+  .qr-sticker-scan { gap: 3mm; padding: 1.5mm 4mm 2.5mm; }
+  .qr-sticker-code { padding: 1.5mm; border-radius: 3mm; }
+  .qr-sticker-code img,
+  .qr-sticker-code canvas { width: 31mm !important; height: 31mm !important; }
+  .qr-sticker-scan h3 { font-size: 9.5pt; }
+  .qr-sticker-scan p { font-size: 7pt; }
+  .qr-sticker-scan span { font-size: 6.5pt; }
+  .qr-sticker > footer { padding: 2mm 3mm; font-size: 6.5pt; }
+}
