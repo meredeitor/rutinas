@@ -399,6 +399,7 @@ async function auditDetail(auditId) {
   const snapshot = await getDoc(doc(db, 'audits', auditId));
   if (!snapshot.exists()) { $('#mainContent').innerHTML = page('Auditoría no encontrada', 'Error', '', '<div class="empty-state">El registro no existe.</div>'); return; }
   const audit = { id: snapshot.id, ...snapshot.data() };
+  if (audit.auditorUid === state.user?.uid && state.adminName) audit.auditorName = state.adminName;
   const resultSnapshot = await getDocs(query(collection(db, 'audits', auditId, 'results'), orderBy('order')));
   const results = resultSnapshot.docs.map(item => ({ id: item.id, ...item.data() }));
   const findingSnapshot = await getDocs(collection(db, 'audits', auditId, 'findings'));
