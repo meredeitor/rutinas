@@ -8,7 +8,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const $ = (selector, scope = document) => scope.querySelector(selector);
 const $$ = (selector, scope = document) => [...scope.querySelectorAll(selector)];
-const state = { user: null, admin: false, browsing: false, machines: [], install: null, objectUrls: [], auditBatch: null };
+const state = { user: null, admin: false, adminName: '', browsing: false, machines: [], install: null, objectUrls: [], auditBatch: null };
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 $$('[data-app-version]').forEach(element => { element.textContent = window.APP_VERSION; });
 
@@ -95,6 +95,7 @@ async function adminAllowed(user) {
   if (!user) return false;
   const snapshot = await getDoc(doc(db, 'usuarios', user.uid));
   const profile = snapshot.data();
+  state.adminName = String(profile?.nombre || profile?.name || user.displayName || '').trim();
   return profile?.rol === 'admin' && profile?.estatus === 'activo';
 }
 function showAccess() {
@@ -102,7 +103,7 @@ function showAccess() {
   $('#appView').hidden = true;
 }
 function showApp() {
-  const name = state.admin ? (state.user?.email || 'Administrador') : 'Operador';
+  const name = state.admin ? (state.adminName || state.user?.email || 'Administrador') : 'Operador';
   $('#profileName').textContent = name;
   $('#profileRole').textContent = state.admin ? 'Administrador de rutinas' : 'Consulta de rutina';
   $('#profileAvatar').textContent = name.charAt(0).toUpperCase();
@@ -372,7 +373,7 @@ async function auditChecklist(machineId, week, auditDate) {
       const compliant = results.filter(item => item.result === 'Cumple').length;
       const findings = results.filter(item => item.result === 'No cumple');
       const compliance = evaluated.length ? Math.round(compliant / evaluated.length * 100) : 100;
-      const reference = await addDoc(collection(db, 'audits'), { batchId: state.auditBatch?.id || crypto.randomUUID(), machineId, machineName: machine.name, plant: machine.plant, department: machine.department, assetNumber: machine.assetNumber, week: String(week), auditDate: String(auditDate), auditorUid: state.user.uid, auditorName: state.user.email || 'Administrador', compliance, status: findings.length ? 'Con hallazgos' : 'Completada', totalActivities: results.length, compliantActivities: compliant, openFindings: findings.length, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      const reference = await addDoc(collection(db, 'audits'), { batchId: state.auditBatch?.id || crypto.randomUUID(), machineId, machineName: machine.name, plant: machine.plant, department: machine.department, assetNumber: machine.assetNumber, week: String(week), auditDate: String(auditDate), auditorUid: state.user.uid, auditorName: state.adminName || state.user.email || 'Administrador', compliance, status: findings.length ? 'Con hallazgos' : 'Completada', totalActivities: results.length, compliantActivities: compliant, openFindings: findings.length, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
       for (const item of results) {
         await addDoc(collection(db, 'audits', reference.id, 'results'), { routineId: item.routineId, activityType: item.activityType, activity: item.activity, frequency: item.frequency, waste: item.waste, order: item.order, result: item.result, observation: item.observation, priority: item.result === 'No cumple' ? item.priority : '', createdAt: serverTimestamp() });
         if (item.result === 'No cumple') {
@@ -476,7 +477,7 @@ $('#loginForm').onsubmit = async event => {
   } catch (error) { toast(error.message, 'error'); }
   finally { busy(button, false); }
 };
-$('#logoutButton').onclick = async () => { state.browsing = false; state.admin = false; await signOut(auth); location.hash = '#/'; showAccess(); };
+$('#logoutButton').onclick = async () => { state.browsing = false; state.admin = false; state.adminName = ''; await signOut(auth); location.hash = '#/'; showAccess(); };
 $('#menuButton').onclick = () => $('#sidebar').classList.add('open');
 $('#sidebarBackdrop').onclick = () => $('#sidebar').classList.remove('open');
 $('#machineForm').onsubmit = async event => {
