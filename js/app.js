@@ -133,14 +133,15 @@ async function routine(machineId) {
   const activities = await getDocs(query(collection(db, 'machines', machineId, 'routines'), orderBy('order')));
   const items = activities.docs.map(item => ({ id: item.id, ...item.data() }));
   const groups = new Map();
-  items.forEach(item => { const frequency = item.frequency || 'Sin frecuencia'; groups.set(frequency, [...(groups.get(frequency) || []), item]); });
+  items.forEach(item => { const activityType = item.activityType || 'General'; groups.set(activityType, [...(groups.get(activityType) || []), item]); });
   let cards = '';
-  for (const [frequency, group] of groups) {
-    cards += `<p class="eyebrow" style="margin-top:25px">${esc(frequency)}</p>`;
+  for (const [activityType, group] of groups) {
+    cards += `<section class="routine-type-group"><header><span>✦</span><div><p>Tipo de actividad</p><h3>${esc(activityType)}</h3></div><b>${group.length} actividad${group.length === 1 ? '' : 'es'}</b></header><div class="routine-type-list">`;
     for (const item of group) {
       const photo = await imageAt('machines', machineId, 'routines', item.id, 'images', 'reference');
-      cards += `<article class="list-card" style="display:block"><div><span class="badge">Paso ${Number(item.order) || 1}</span><h3>${esc(item.activity)}</h3></div><div style="margin-top:13px"><small>Material</small><p>${esc(item.material || 'No aplica')}</p><small>Equipo de protección</small><p>${esc(item.ppe || 'No aplica')}</p></div>${item.waste ? `<div class="notice"><strong>⚠ Residuos / advertencia</strong><span>${esc(item.waste)}</span></div>` : ''}${photo ? `<img class="photo" src="${photo}" alt="Referencia de ${esc(item.activity)}">` : ''}</article>`;
+      cards += `<article class="list-card routine-activity-card" style="display:block"><div class="routine-card-heading"><span class="badge">Paso ${Number(item.order) || 1}</span><span class="frequency-chip">${esc(item.frequency || 'Sin frecuencia')}</span><h3>${esc(item.activity)}</h3></div><div class="routine-details"><div><small>Material</small><p>${esc(item.material || 'No aplica')}</p></div><div><small>Equipo de protección</small><p>${esc(item.ppe || 'No aplica')}</p></div></div>${item.waste ? `<div class="notice"><strong>⚠ Residuos / advertencia</strong><span>${esc(item.waste)}</span></div>` : ''}${photo ? `<img class="photo" src="${photo}" alt="Referencia de ${esc(item.activity)}">` : ''}</article>`;
     }
+    cards += '</div></section>';
   }
   $('#mainContent').innerHTML = page(machine.name, 'Rutina de mantenimiento', `${machine.plant} · ${machine.department} · Activo ${machine.assetNumber}`, cards || '<div class="empty-state">Esta máquina aún no tiene actividades.</div>', '<a class="button secondary" href="#/">Volver</a>');
 }
@@ -180,7 +181,7 @@ async function routineAdmin(machine) {
   if (!machine) return admin();
   const snapshot = await getDocs(query(collection(db, 'machines', machine.id, 'routines'), orderBy('order')));
   const routines = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
-  const cards = routines.map(item => `<article class="list-card"><div><span class="badge">${esc(item.frequency)}</span><h3>${esc(item.activity)}</h3><p>${esc(item.material || 'Sin material')}</p></div><div><small>Orden</small><p>${Number(item.order) || 1}</p></div><div class="list-actions"><button class="button secondary compact" data-edit-routine="${esc(item.id)}">Editar</button><button class="button danger compact" data-delete-routine="${esc(item.id)}">Eliminar</button></div></article>`).join('');
+  const cards = routines.map(item => `<article class="list-card"><div><span class="badge">${esc(item.activityType || 'General')}</span><h3>${esc(item.activity)}</h3><p>${esc(item.frequency)} · ${esc(item.material || 'Sin material')}</p></div><div><small>Orden</small><p>${Number(item.order) || 1}</p></div><div class="list-actions"><button class="button secondary compact" data-edit-routine="${esc(item.id)}">Editar</button><button class="button danger compact" data-delete-routine="${esc(item.id)}">Eliminar</button></div></article>`).join('');
   $('#mainContent').innerHTML = page(`Actividades · ${machine.name}`, 'Rutina', 'Organiza los pasos que verá el operador.', `<div class="card-list">${cards || '<div class="empty-state">No hay actividades registradas.</div>'}</div>`, '<button id="newRoutine" class="button primary">＋ Agregar actividad</button><button id="backAdmin" class="button secondary">Volver</button>');
   $('#newRoutine').onclick = () => routineModal(machine);
   $('#backAdmin').onclick = admin;
@@ -212,7 +213,7 @@ function machineModal(machine = {}) {
 function routineModal(machine, routine = {}) {
   const form = $('#routineForm');
   form.reset();
-  for (const field of ['activity', 'frequency', 'order', 'material', 'ppe', 'waste']) form.elements[field].value = routine[field] ?? (field === 'frequency' ? 'Diaria' : field === 'order' ? 1 : '');
+  for (const field of ['activityType', 'activity', 'frequency', 'order', 'material', 'ppe', 'waste']) form.elements[field].value = routine[field] ?? (field === 'activityType' ? 'General' : field === 'frequency' ? 'Diaria' : field === 'order' ? 1 : '');
   form.elements.machineId.value = machine.id;
   form.elements.routineId.value = routine.id || '';
   $('#routineDialogTitle').textContent = routine.id ? 'Editar actividad' : 'Agregar actividad';
@@ -341,7 +342,7 @@ async function auditChecklist(machineId, week, auditDate) {
     location.hash = '#/auditorias';
     return;
   }
-  const rows = routines.map((item, index) => `<article class="audit-item" data-audit-item data-routine-id="${esc(item.id)}" data-activity="${esc(item.activity)}" data-frequency="${esc(item.frequency)}" data-waste="${esc(item.waste || '')}" data-order="${Number(item.order) || index + 1}"><header><span class="audit-step">${Number(item.order) || index + 1}</span><div><span class="badge">${esc(item.frequency)}</span><h3>${esc(item.activity)}</h3></div></header>${item.waste ? `<div class="audit-warning"><strong>⚠ Residuos / advertencia</strong><span>${esc(item.waste)}</span></div>` : ''}<div class="audit-item-fields"><label>Resultado<select name="result" required><option value="">Seleccionar</option><option value="Cumple">Cumple</option><option value="No cumple">No cumple</option><option value="No aplica">No aplica</option></select></label><label class="finding-only">Prioridad<select name="priority"><option value="Media">Media</option><option value="Baja">Baja</option><option value="Alta">Alta</option><option value="Crítica">Crítica</option></select></label><label class="span-2">Observación o hallazgo<textarea name="observation" rows="2" maxlength="1000" placeholder="Describe lo observado"></textarea></label><label class="finding-only">Responsable<input name="responsible" maxlength="120" placeholder="Nombre o área responsable"></label><label class="finding-only">Fecha compromiso<input name="dueDate" type="date"></label><label class="span-2 finding-only">Evidencia del hallazgo <small>Máximo final 180 KB.</small><input name="evidence" type="file" accept="image/png,image/jpeg,image/webp"></label></div></article>`).join('');
+  const rows = routines.map((item, index) => `<article class="audit-item" data-audit-item data-routine-id="${esc(item.id)}" data-activity-type="${esc(item.activityType || 'General')}" data-activity="${esc(item.activity)}" data-frequency="${esc(item.frequency)}" data-waste="${esc(item.waste || '')}" data-order="${Number(item.order) || index + 1}"><header><span class="audit-step">${Number(item.order) || index + 1}</span><div><span class="badge">${esc(item.activityType || 'General')}</span><span class="frequency-chip">${esc(item.frequency)}</span><h3>${esc(item.activity)}</h3></div></header>${item.waste ? `<div class="audit-warning"><strong>⚠ Residuos / advertencia</strong><span>${esc(item.waste)}</span></div>` : ''}<div class="audit-item-fields"><label>Resultado<select name="result" required><option value="">Seleccionar</option><option value="Cumple">Cumple</option><option value="No cumple">No cumple</option><option value="No aplica">No aplica</option></select></label><label class="finding-only">Prioridad<select name="priority"><option value="Media">Media</option><option value="Baja">Baja</option><option value="Alta">Alta</option><option value="Crítica">Crítica</option></select></label><label class="span-2">Observación o hallazgo<textarea name="observation" rows="2" maxlength="1000" placeholder="Describe lo observado"></textarea></label><label class="finding-only">Responsable<input name="responsible" maxlength="120" placeholder="Nombre o área responsable"></label><label class="finding-only">Fecha compromiso<input name="dueDate" type="date"></label><label class="span-2 finding-only">Evidencia del hallazgo <small>Máximo final 180 KB.</small><input name="evidence" type="file" accept="image/png,image/jpeg,image/webp"></label></div></article>`).join('');
   const batchPosition = state.auditBatch ? `Máquina ${state.auditBatch.current + 1} de ${state.auditBatch.machineIds.length} · ` : '';
   $('#mainContent').innerHTML = page(`Auditar · ${machine.name}`, `${machine.plant} · ${machine.department}`, `${batchPosition}Semana ${week} · Activo ${machine.assetNumber}`, `<form id="auditForm"><div class="audit-progress"><strong id="auditAnswered">0 de ${routines.length} evaluadas</strong><span><i id="auditProgressBar"></i></span></div><div class="audit-checklist">${rows}</div><div class="audit-submit"><button class="button primary big" type="submit">Guardar y continuar</button><a class="button secondary big" href="#/auditorias">Cancelar lote</a></div></form>`);
   const form = $('#auditForm');
@@ -360,7 +361,7 @@ async function auditChecklist(machineId, week, auditDate) {
     const button = $('button[type="submit"]', form);
     const results = $$('[data-audit-item]', form).map(item => {
       const result = $('[name="result"]', item).value;
-      return { item, routineId: item.dataset.routineId, activity: item.dataset.activity, frequency: item.dataset.frequency, waste: item.dataset.waste, order: Number(item.dataset.order), result, observation: $('[name="observation"]', item).value.trim(), priority: $('[name="priority"]', item).value, responsible: $('[name="responsible"]', item).value.trim(), dueDate: $('[name="dueDate"]', item).value, evidence: $('[name="evidence"]', item).files[0] };
+      return { item, routineId: item.dataset.routineId, activityType: item.dataset.activityType, activity: item.dataset.activity, frequency: item.dataset.frequency, waste: item.dataset.waste, order: Number(item.dataset.order), result, observation: $('[name="observation"]', item).value.trim(), priority: $('[name="priority"]', item).value, responsible: $('[name="responsible"]', item).value.trim(), dueDate: $('[name="dueDate"]', item).value, evidence: $('[name="evidence"]', item).files[0] };
     });
     if (results.some(item => !item.result)) { toast('Evalúa todas las actividades antes de finalizar.', 'error'); return; }
     const incomplete = results.find(item => item.result === 'No cumple' && (!item.observation || !item.responsible || !item.dueDate));
@@ -373,9 +374,9 @@ async function auditChecklist(machineId, week, auditDate) {
       const compliance = evaluated.length ? Math.round(compliant / evaluated.length * 100) : 100;
       const reference = await addDoc(collection(db, 'audits'), { batchId: state.auditBatch?.id || crypto.randomUUID(), machineId, machineName: machine.name, plant: machine.plant, department: machine.department, assetNumber: machine.assetNumber, week: String(week), auditDate: String(auditDate), auditorUid: state.user.uid, auditorName: state.user.email || 'Administrador', compliance, status: findings.length ? 'Con hallazgos' : 'Completada', totalActivities: results.length, compliantActivities: compliant, openFindings: findings.length, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
       for (const item of results) {
-        await addDoc(collection(db, 'audits', reference.id, 'results'), { routineId: item.routineId, activity: item.activity, frequency: item.frequency, waste: item.waste, order: item.order, result: item.result, observation: item.observation, priority: item.result === 'No cumple' ? item.priority : '', createdAt: serverTimestamp() });
+        await addDoc(collection(db, 'audits', reference.id, 'results'), { routineId: item.routineId, activityType: item.activityType, activity: item.activity, frequency: item.frequency, waste: item.waste, order: item.order, result: item.result, observation: item.observation, priority: item.result === 'No cumple' ? item.priority : '', createdAt: serverTimestamp() });
         if (item.result === 'No cumple') {
-          const finding = await addDoc(collection(db, 'audits', reference.id, 'findings'), { routineId: item.routineId, activity: item.activity, description: item.observation, priority: item.priority, responsible: item.responsible, dueDate: item.dueDate, status: 'Abierto', correctiveAction: '', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+          const finding = await addDoc(collection(db, 'audits', reference.id, 'findings'), { routineId: item.routineId, activityType: item.activityType, activity: item.activity, description: item.observation, priority: item.priority, responsible: item.responsible, dueDate: item.dueDate, status: 'Abierto', correctiveAction: '', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
           if (item.evidence) await savePhoto(['audits', reference.id, 'findings', finding.id, 'images', 'before'], item.evidence);
         }
       }
@@ -401,7 +402,7 @@ async function auditDetail(auditId) {
   const results = resultSnapshot.docs.map(item => ({ id: item.id, ...item.data() }));
   const findingSnapshot = await getDocs(collection(db, 'audits', auditId, 'findings'));
   const findings = findingSnapshot.docs.map(item => ({ id: item.id, ...item.data() }));
-  const resultRows = results.map(item => `<tr><td>${Number(item.order)}</td><td>${esc(item.activity)}<small>${esc(item.frequency)}</small>${item.waste ? `<small class="result-warning">⚠ Residuos / advertencia: ${esc(item.waste)}</small>` : ''}</td><td><span class="result-pill ${auditStatusClass(item.result)}">${esc(item.result)}</span></td><td>${esc(item.observation || '—')}</td></tr>`).join('');
+  const resultRows = results.map(item => `<tr><td>${Number(item.order)}</td><td>${esc(item.activity)}<small>${esc(item.activityType || 'General')} · ${esc(item.frequency)}</small>${item.waste ? `<small class="result-warning">⚠ Residuos / advertencia: ${esc(item.waste)}</small>` : ''}</td><td><span class="result-pill ${auditStatusClass(item.result)}">${esc(item.result)}</span></td><td>${esc(item.observation || '—')}</td></tr>`).join('');
   const findingCards = [];
   for (const finding of findings) {
     const before = await imageAt('audits', auditId, 'findings', finding.id, 'images', 'before');
@@ -506,7 +507,7 @@ $('#routineForm').onsubmit = async event => {
   const form = new FormData(event.currentTarget);
   const button = $('button[type="submit"]', event.currentTarget);
   const machineId = form.get('machineId');
-  const payload = { activity: String(form.get('activity')).trim(), frequency: form.get('frequency'), order: Number(form.get('order')), material: String(form.get('material')).trim(), ppe: String(form.get('ppe')).trim(), waste: String(form.get('waste')).trim(), updatedAt: serverTimestamp() };
+  const payload = { activityType: String(form.get('activityType')).trim(), activity: String(form.get('activity')).trim(), frequency: form.get('frequency'), order: Number(form.get('order')), material: String(form.get('material')).trim(), ppe: String(form.get('ppe')).trim(), waste: String(form.get('waste')).trim(), updatedAt: serverTimestamp() };
   busy(button, true, 'Guardando…');
   try {
     const id = form.get('routineId');
