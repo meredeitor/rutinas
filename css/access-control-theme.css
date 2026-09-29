@@ -1,0 +1,103 @@
+/* Tema visual inspirado en Caborca Access Control · Rutinas v1.3.0 */
+:root{--green:#087df5;--green-2:#075ad8;--mint:#e8f2ff;--gold:#57a9ff;--ink:#eef5ff;--muted:#9cabc0;--line:rgba(126,164,216,.18);--bg:#07111f;--danger:#ff6b76;--shadow:0 18px 50px rgba(0,0,0,.28);color-scheme:dark;background:#07111f;color:var(--ink)}
+body{background:radial-gradient(circle at 90% 0,rgba(0,112,218,.13),transparent 34%),#07111f;color:var(--ink)}
+.lead,.page-heading p,.muted{color:var(--muted)}
+.eyebrow{color:#69b9ff}.eyebrow.light{color:#d6ecff}
+.button{border:1px solid transparent;border-radius:13px;transition:transform .18s ease,box-shadow .18s ease,background .18s ease}
+.button:hover{transform:translateY(-1px)}
+.button.primary{background:linear-gradient(135deg,#168dff,#0662e7);color:#fff;box-shadow:0 10px 25px rgba(4,112,255,.28)}
+.button.secondary{border-color:rgba(103,169,255,.2);background:rgba(35,113,207,.14);color:#beddff}
+.button.danger{background:rgba(255,80,96,.12);color:#ff9da7}
+.version-badge,.badge{background:rgba(43,128,229,.16);color:#a9d5ff}
+
+/* Acceso */
+.access-view{min-height:100vh;padding:24px;background:radial-gradient(circle at 10% 0,#102f5d 0,transparent 32%),radial-gradient(circle at 100% 100%,#07314b 0,transparent 36%),#07111f}
+.access-shell{width:min(100%,980px);min-height:560px;display:grid;grid-template-columns:1.08fr .92fr;overflow:hidden;border:1px solid rgba(120,164,224,.18);border-radius:28px;background:#0a1424;box-shadow:0 32px 90px rgba(0,0,0,.42)}
+.access-hero{position:relative;display:flex;align-items:flex-end;padding:44px;background:radial-gradient(circle at 100% 0,rgba(255,255,255,.16),transparent 36%),linear-gradient(145deg,#1287ff 0%,#0968e7 58%,#0743a9 100%);overflow:hidden}
+.access-hero:before,.access-hero:after{content:"";position:absolute;left:-12%;right:-12%;height:150px;bottom:-85px;background:rgba(4,39,119,.28);transform:rotate(-18deg)}
+.access-hero:after{bottom:-118px;background:rgba(1,27,83,.32);transform:rotate(18deg)}
+.access-theme-icon{position:absolute;right:22px;top:22px;width:44px;height:44px;display:grid;place-items:center;border:1px solid rgba(255,255,255,.22);border-radius:13px;background:rgba(255,255,255,.12);font-size:20px}
+.access-hero-content{position:relative;z-index:1}
+.access-hero .brand-mark{width:66px;height:66px;margin:0 0 22px;border:1px solid rgba(255,255,255,.25);border-radius:20px;background:rgba(255,255,255,.13);color:#fff;font-size:33px;box-shadow:0 12px 30px rgba(0,37,104,.3)}
+.access-hero h1{margin:7px 0 14px;font-size:clamp(38px,5.2vw,58px);line-height:.98;letter-spacing:-.04em}
+.access-hero p:not(.eyebrow){max-width:430px;margin:0;color:#ddecff;line-height:1.55}
+.access-benefits{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
+.access-benefits span{padding:7px 10px;border:1px solid rgba(255,255,255,.18);border-radius:999px;background:rgba(255,255,255,.11);font-size:11px;font-weight:800}
+.access-card{width:auto;padding:clamp(30px,5vw,50px);border-radius:0;background:linear-gradient(180deg,#0d1729,#091321);box-shadow:none;text-align:left;display:flex;flex-direction:column;justify-content:center}
+.access-card h2{margin:4px 0 8px;font-size:clamp(28px,4vw,38px);letter-spacing:-.025em}
+.access-actions{margin:28px 0 14px}.access-actions .button{width:100%}
+.access-card .button.secondary{background:#12233d}
+.access-help{padding:14px 16px;border:1px solid rgba(119,165,229,.16);border-radius:13px;background:#101e34;color:#8396af;font-size:12px;text-align:center}
+.access-card .version-badge{align-self:flex-start;margin-top:18px}
+
+/* Aplicación */
+.app-view{background:var(--bg)}
+.topbar{height:76px;padding:0 26px;background:rgba(7,17,31,.91);border-bottom:1px solid var(--line);backdrop-filter:blur(18px)}
+.brand{color:#f4f8ff}.brand span{width:38px;height:38px;display:grid;place-items:center;border-radius:12px;background:linear-gradient(145deg,#168dff,#075ad8);font-size:20px;box-shadow:0 8px 22px rgba(4,112,255,.32)}
+.icon-button{color:#c9ddf5}.top-actions .icon-button{border:1px solid var(--line);background:rgba(255,255,255,.04)}
+.connection.online{background:rgba(39,209,154,.14);color:#71ecc5}.connection.offline{background:rgba(255,189,89,.14);color:#ffd18b}
+.sidebar{top:76px;width:262px;padding:24px 16px 18px;background:linear-gradient(180deg,#0a2d54 0%,#081a31 46%,#071320 100%);border-right:1px solid var(--line)}
+.profile-card{padding:10px 8px 22px;border-bottom-color:var(--line)}.profile-card small{color:#8fa8c5}
+.avatar{background:linear-gradient(145deg,#2398ff,#075ad8);color:#fff;box-shadow:0 8px 20px rgba(4,112,255,.28)}
+.sidebar nav a{color:#a9bdd5;border:1px solid transparent}
+.sidebar nav a:hover{background:rgba(255,255,255,.05);color:#fff}
+.sidebar nav a.active{border-color:rgba(94,167,255,.18);background:linear-gradient(90deg,rgba(8,125,245,.78),rgba(8,125,245,.25));color:#fff;box-shadow:0 10px 24px rgba(1,25,58,.25)}
+.sidebar-version{color:#66829f}
+.main-content{margin-left:262px;padding:105px 30px 44px;background:radial-gradient(circle at 100% 0,rgba(9,111,213,.1),transparent 38%),#07111f}
+.page{width:min(1240px,100%)}
+.page-heading{margin:4px 0 26px}.page-heading h2{color:#f6f9ff;letter-spacing:-.025em}.page-heading p{margin:.35rem 0 0}
+.hero{background:radial-gradient(circle at 92% 0,rgba(255,255,255,.13),transparent 30%),linear-gradient(120deg,#0b6fe4,#0848aa);box-shadow:0 22px 55px rgba(0,63,151,.28)}
+.hero p:last-child{color:#d6e9ff}
+.machine-card,.admin-card,.list-card,.info-card,.audit-batch-group,.routine-type-group{border-color:var(--line);background:#0d192b;box-shadow:0 12px 34px rgba(0,0,0,.18);color:#eef5ff}
+.machine-art{background:linear-gradient(145deg,#123968,#0a1f3a)}
+.machine-review,.machine-model,.list-card p,.list-card small{color:var(--muted)}
+.machine-availability{color:#62dcb6}
+.empty-state{border-color:rgba(126,164,216,.25);background:rgba(14,29,50,.7);color:var(--muted)}
+.status{background:rgba(39,209,154,.14);color:#75e4bf}
+
+/* Formularios, filtros y ventanas */
+.machine-filters{border-color:rgba(100,165,255,.18);background:radial-gradient(circle at 8% 0,#0c61ba 0,transparent 38%),linear-gradient(135deg,#0a2c52,#0b1e37);box-shadow:0 18px 42px rgba(0,0,0,.25)}
+.machine-filters label span{color:#cfe7ff}
+.machine-filters input,.machine-filters select{border-color:rgba(123,173,238,.22);background-color:#f4f8ff;color:#10233d}
+.machine-filters input:focus,.machine-filters select:focus{border-color:#168dff;box-shadow:0 0 0 4px rgba(22,141,255,.2),0 9px 22px rgba(0,0,0,.2)}
+.machine-filters select{background-image:linear-gradient(45deg,transparent 50%,#0873e5 50%),linear-gradient(135deg,#0873e5 50%,transparent 50%)}
+.machine-search:after{color:#0873e5}.machine-filters .button{border-color:#57a9ff;background:#168dff;color:#fff}.filter-count{background:rgba(20,111,213,.16);color:#91caff}
+.modal{border:1px solid var(--line);background:#0d192b;color:#eef5ff;box-shadow:0 30px 90px rgba(0,0,0,.55)}
+.modal::backdrop{background:rgba(2,8,18,.78);backdrop-filter:blur(5px)}
+.modal label{color:#b9c8db}.modal input,.modal textarea,.modal select{border-color:rgba(130,169,221,.22);background:#f4f8ff;color:#10233d}
+.modal input:focus,.modal textarea:focus,.modal select:focus{border-color:#168dff;box-shadow:0 0 0 3px rgba(22,141,255,.19)}
+.toast{background:#0d68c8}.toast.error{background:#a93343}
+
+/* Rutinas y auditorías */
+.routine-type-group{background:#0a1627}.routine-type-group>header,.help-manual-heading{background:linear-gradient(135deg,#0c6fda,#073f91)}
+.routine-type-group>header>span{background:rgba(255,255,255,.15);color:#fff}.routine-type-group>header p{color:#c9e4ff}
+.routine-type-list{background:#091421}.routine-details>div{background:#111f33}.routine-details p{color:#c2d0e2}
+.frequency-chip{background:rgba(255,189,89,.14);color:#ffd18b}
+.notice,.audit-warning{border-left-color:#ffae42;background:rgba(255,174,66,.1);color:#ffd18b}.notice strong,.audit-warning strong,.result-warning{color:#ffc46d!important}
+.audit-batch-group{background:rgba(13,25,43,.82)}.audit-batch-group>header>span{background:#087df5}.audit-summary article,.audit-card,.finding-card,.audit-item,.audit-batch-data{border-color:var(--line)!important;background:#0d192b!important;color:#eef5ff}
+.help-manual details{border-color:var(--line);background:#0d192b}.help-manual details[open] summary{background:#11213a}.help-manual summary small,.help-manual ol{color:#aab9cb}.help-manual summary>span{background:rgba(8,125,245,.16);color:#79bdff}.help-manual summary:after{color:#79bdff}
+.qr-select-card{border-color:var(--line)!important;background:#0d192b!important;color:#eef5ff}
+.qr-select-card:has(input:checked){border-color:#168dff!important;background:#102a4d!important}
+.photo{background:#10243e}
+
+/* La impresión conserva sus colores y fondo blanco */
+.qr-sticker,.qr-poster{color:#17251f}
+@media(max-width:900px){
+  .sidebar{top:0}.main-content{margin-left:0;padding:96px 18px 34px}
+}
+@media(max-width:720px){
+  .access-view{padding:0;align-items:stretch}
+  .access-shell{min-height:100vh;grid-template-columns:1fr;border:0;border-radius:0}
+  .access-hero{min-height:325px;padding:28px 24px}
+  .access-hero h1{font-size:42px}
+  .access-card{padding:30px 24px 36px}
+}
+@media(max-width:600px){
+  .topbar{height:68px;padding:0 12px}.brand span{width:34px;height:34px}.top-actions{gap:5px}
+  .main-content{padding:86px 12px 28px}.page-heading h2{font-size:28px}
+  .machine-card,.admin-machine-card{background:#0d192b}.machine-art{min-height:150px}
+  .routine-type-group>header{background:linear-gradient(135deg,#0c6fda,#073f91)}
+}
+@media print{
+  :root{color-scheme:light}.main-content{background:#fff}.qr-sticker,.qr-poster{color:#17251f}
+}

@@ -3,7 +3,7 @@
   "short_name": "Rutinas",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#f7f5f3",
-  "theme_color": "#642b3d",
+  "background_color": "#07111f",
+  "theme_color": "#087df5",
   "icons": [{ "src": "./icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
 }
