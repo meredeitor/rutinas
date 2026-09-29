@@ -5,6 +5,7 @@
   let theme = saved === 'light' || saved === 'dark'
     ? saved
     : (window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark');
+  const scene = '<span class="theme-scene" aria-hidden="true"><span class="theme-sun">☀</span><span class="theme-moon">☾</span><span class="theme-cloud"></span></span>';
 
   const accessPlaceholder = document.querySelector('.access-theme-icon');
   if (accessPlaceholder) {
@@ -13,7 +14,7 @@
     button.className = 'access-theme-icon';
     button.type = 'button';
     button.title = 'Cambiar tema';
-    button.innerHTML = '<span data-theme-icon></span>';
+    button.innerHTML = scene;
     accessPlaceholder.replaceWith(button);
   }
 
@@ -25,7 +26,7 @@
     button.className = 'icon-button theme-toggle';
     button.type = 'button';
     button.title = 'Cambiar tema';
-    button.innerHTML = '<span data-theme-icon></span>';
+    button.innerHTML = scene;
     topActions.insertBefore(button, logoutButton);
   }
 
@@ -34,7 +35,6 @@
     root.dataset.theme = theme;
     root.style.colorScheme = theme;
     document.querySelector('meta[name="theme-color"]')?.setAttribute('content', theme === 'dark' ? '#07111f' : '#edf5ff');
-    document.querySelectorAll('[data-theme-icon]').forEach(icon => { icon.textContent = theme === 'dark' ? '☀' : '☾'; });
     document.querySelectorAll('#accessThemeToggle, #appThemeToggle').forEach(button => {
       button.setAttribute('aria-label', theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro');
     });
