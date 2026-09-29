@@ -104,15 +104,23 @@ function showAccess() {
 }
 function showApp() {
   const name = state.admin ? (state.adminName || state.user?.email || 'Administrador') : 'Operador';
-  $('#profileName').textContent = name;
-  $('#profileRole').textContent = state.admin ? 'Administrador de rutinas' : 'Consulta de rutina';
-  $('#profileAvatar').textContent = name.charAt(0).toUpperCase();
-  $('#navigation').innerHTML = state.admin
-    ? '<a href="#/admin" data-page="admin">▦ <span>Administrar máquinas</span></a><a href="#/auditorias" data-page="auditorias">✓ <span>Auditorías</span></a><a href="#/qr" data-page="qr">▣ <span>Códigos QR</span></a><a href="#/help" data-page="help">? <span>Ayuda</span></a>'
-    : '<a href="#/" data-page="home">⌕ <span>Consultar rutina</span></a><a href="#/help" data-page="help">? <span>Ayuda</span></a>';
+  $('#brandLink').href = state.admin ? '#/menu' : '#/';
+  $('#homeButton').href = state.admin ? '#/menu' : '#/';
+  $('#homeButton').title = state.admin ? `Inicio · ${name}` : 'Inicio';
   $('#accessView').hidden = true;
   $('#appView').hidden = false;
   render();
+}
+function adminMenu() {
+  const name = state.adminName || state.user?.displayName || state.user?.email?.split('@')[0] || 'Administrador';
+  const firstName = name.split(/\s+/)[0];
+  const cards = [
+    { href: '#/admin', icon: '⚙', tone: 'blue', title: 'Administrar máquinas', text: 'Máquinas, fotografías y actividades' },
+    { href: '#/auditorias', icon: '✓', tone: 'mint', title: 'Auditorías', text: 'Evaluaciones, hallazgos y seguimiento' },
+    { href: '#/qr', icon: '▣', tone: 'amber', title: 'Códigos QR', text: 'Selecciona, prepara e imprime tarjetas' },
+    { href: '#/help', icon: '?', tone: 'purple', title: 'Ayuda', text: 'Guía completa y versión de la aplicación' }
+  ].map(item => `<a class="main-menu-card" href="${item.href}"><span class="main-menu-icon ${item.tone}">${item.icon}</span><span><strong>${item.title}</strong><small>${item.text}</small></span><b aria-hidden="true">›</b></a>`).join('');
+  $('#mainContent').innerHTML = `<section class="page main-menu-page"><div class="welcome-panel"><p class="eyebrow">Panel administrativo</p><h1>Bienvenido,<br>${esc(firstName)}</h1><p>Selecciona una opción para gestionar las rutinas de mantenimiento.</p><span class="welcome-decoration">☀</span></div><div class="main-menu-grid">${cards}</div><p class="main-menu-version">Rutinas STC · Versión ${esc(window.APP_VERSION)}</p></section>`;
 }
 async function home() {
   clearImages();
@@ -433,7 +441,7 @@ async function auditDetail(auditId) {
 function help() {
   const instructions = state.admin ? 'Crea una máquina, agrega sus actividades y genera el QR para colocar en la estación.' : 'Escanea el QR de tu estación, sigue los pasos en orden y consulta las fotos si tienes dudas.';
   const manual = `<section class="help-manual"><div class="help-manual-heading"><p class="eyebrow">Manual de uso</p><h2>Todas las funciones de la aplicación</h2><p>Abre cada tema para consultar el procedimiento completo.</p></div>
-  <details open><summary><span>01</span><div><strong>Acceso y perfiles</strong><small>Operadores y administradores</small></div></summary><ol><li>En la pantalla inicial, pulsa <b>Consultar rutina</b> para entrar como operador sin iniciar sesión.</li><li>Pulsa <b>Acceso administrador</b> para gestionar máquinas, actividades, QR y auditorías.</li><li>Escribe el correo y contraseña registrados en Firebase Authentication.</li><li>La cuenta debe tener un documento en <code>usuarios/{uid}</code> con <code>rol: admin</code> y <code>estatus: activo</code>.</li><li>Si el perfil contiene el campo <code>nombre</code>, se mostrará en el sidebar y en los reportes; de lo contrario se mostrará el correo.</li><li>Usa el botón de salida ubicado arriba a la derecha para cerrar la sesión de forma segura.</li></ol></details>
+  <details open><summary><span>01</span><div><strong>Acceso y perfiles</strong><small>Operadores y administradores</small></div></summary><ol><li>En la pantalla inicial, pulsa <b>Consultar rutina</b> para entrar como operador sin iniciar sesión.</li><li>Pulsa <b>Acceso administrador</b> para gestionar máquinas, actividades, QR y auditorías.</li><li>Escribe el correo y contraseña registrados en Firebase Authentication.</li><li>La cuenta debe tener un documento en <code>usuarios/{uid}</code> con <code>rol: admin</code> y <code>estatus: activo</code>.</li><li>Si el perfil contiene el campo <code>nombre</code>, se mostrará en la bienvenida y en los reportes; de lo contrario se mostrará el correo.</li><li>Usa el botón de salida ubicado arriba a la derecha para cerrar la sesión de forma segura.</li></ol></details>
   <details><summary><span>02</span><div><strong>Administrar máquinas</strong><small>Alta, edición y eliminación</small></div></summary><ol><li>Abre <b>Administrar máquinas</b> desde el menú.</li><li>Usa el buscador o filtra por Planta y Departamento para localizar un registro.</li><li>Pulsa <b>Agregar máquina</b> y captura Nombre, Planta, Departamento, No. de Activo, Foto y Descripción.</li><li>La foto se convierte automáticamente a WebP y se reduce a un máximo de 180 KB.</li><li>Pulsa <b>Editar</b> para cambiar los datos o reemplazar la fotografía.</li><li>Pulsa <b>Eliminar</b> para borrar la máquina, sus actividades y fotografías. Esta acción requiere confirmación y no se puede deshacer.</li></ol></details>
   <details><summary><span>03</span><div><strong>Actividades de mantenimiento</strong><small>Construcción de la rutina</small></div></summary><ol><li>En la tarjeta de una máquina, pulsa <b>Actividades</b>.</li><li>Agrega el Tipo de actividad, por ejemplo Limpieza, Lubricación, Inspección, Ajuste o Conservación. También puedes escribir otro tipo.</li><li>Captura la descripción de la actividad, Frecuencia, Orden, Material, Equipo de protección y Residuos / advertencia.</li><li>Agrega una fotografía de referencia cuando ayude al operador a identificar el punto de trabajo.</li><li>Usa el Orden para establecer la secuencia de los pasos.</li><li>Edita o elimina actividades desde la misma pantalla.</li><li>En la rutina del operador, las actividades se agrupan automáticamente en contenedores por Tipo de actividad.</li><li>Los registros antiguos sin tipo aparecen en el grupo <b>General</b> hasta que sean editados.</li></ol></details>
   <details><summary><span>04</span><div><strong>Consulta de rutina</strong><small>Uso del operador</small></div></summary><ol><li>El operador puede escanear el QR colocado en la máquina o entrar por <b>Consultar rutina</b>.</li><li>Si entra manualmente, selecciona la tarjeta de la máquina y pulsa <b>Ver rutina</b>.</li><li>Consulta los grupos de actividades y sigue los pasos en el orden indicado.</li><li>Cada actividad muestra frecuencia, material, equipo de protección, residuos o advertencias y fotografía de referencia.</li><li>El QR abre directamente la máquina correspondiente sin solicitar inicio de sesión.</li></ol></details>
@@ -443,7 +451,7 @@ function help() {
   <details><summary><span>08</span><div><strong>Seguimiento de hallazgos</strong><small>Corrección, verificación y cierre</small></div></summary><ol><li>Abre una auditoría desde el historial y localiza el hallazgo.</li><li>Cambia su estado entre Abierto, En proceso, Corregido, Verificado o Cerrado.</li><li>Captura la Acción correctiva realizada.</li><li>Adjunta una Evidencia de corrección para comparar el antes y después.</li><li>Pulsa <b>Guardar seguimiento</b>.</li><li>Un hallazgo deja de contarse como abierto cuando está Verificado o Cerrado.</li><li>Cuando todos los hallazgos están atendidos, la auditoría cambia automáticamente a Cerrada.</li></ol></details>
   <details><summary><span>09</span><div><strong>Historial y reportes</strong><small>Consulta e impresión</small></div></summary><ol><li>La pantalla de Auditorías muestra cantidad realizada, cumplimiento promedio y hallazgos abiertos.</li><li>Las tarjetas se agrupan por Jornada de auditoría y muestran máquina, activo, resultado y hallazgos pendientes.</li><li>Pulsa <b>Ver auditoría</b> para abrir el reporte detallado.</li><li>El reporte conserva una copia histórica de máquina, planta, departamento, actividades, tipos, advertencias y auditor.</li><li>Revisa la evaluación, observaciones, hallazgos, responsables, fechas y fotografías.</li><li>Pulsa <b>Imprimir reporte</b> para obtener una versión preparada para hoja A4.</li></ol></details>
   <details><summary><span>10</span><div><strong>Búsqueda y filtros</strong><small>Localización rápida</small></div></summary><ol><li>El buscador reconoce nombre de máquina, número de activo, descripción, planta y departamento.</li><li>Combina el texto con los filtros de Planta y Departamento.</li><li>El contador indica cuántas máquinas coinciden.</li><li>Pulsa <b>Limpiar filtros</b> para restaurar la lista completa.</li><li>Los filtros están disponibles en Administración, Códigos QR y selección de máquinas para auditoría.</li></ol></details>
-  <details><summary><span>11</span><div><strong>Instalación, conexión y actualización</strong><small>Funciones de la PWA</small></div></summary><ol><li>Cuando el navegador lo permita, pulsa <b>Instalar</b> en la barra superior para agregar la PWA al teléfono o computadora.</li><li>El indicador superior muestra si la aplicación está En línea o Sin conexión.</li><li>Se necesita conexión para leer o guardar la información vigente de Firebase.</li><li>El Service Worker conserva los archivos principales de la interfaz y cambia de caché con cada versión.</li><li>La versión instalada aparece en la pantalla inicial, al final del sidebar y en Ayuda → Acerca de.</li><li>Si una actualización no aparece inmediatamente, cierra y vuelve a abrir la PWA o recarga la página.</li></ol></details>
+  <details><summary><span>11</span><div><strong>Instalación, conexión y actualización</strong><small>Funciones de la PWA</small></div></summary><ol><li>Cuando el navegador lo permita, pulsa <b>Instalar</b> en la barra superior para agregar la PWA al teléfono o computadora.</li><li>El indicador superior muestra si la aplicación está En línea o Sin conexión.</li><li>Se necesita conexión para leer o guardar la información vigente de Firebase.</li><li>El Service Worker conserva los archivos principales de la interfaz y cambia de caché con cada versión.</li><li>La versión instalada aparece en la pantalla inicial, en el menú principal y en Ayuda → Acerca de.</li><li>Si una actualización no aparece inmediatamente, cierra y vuelve a abrir la PWA o recarga la página.</li></ol></details>
   <details><summary><span>12</span><div><strong>Seguridad y almacenamiento</strong><small>Firebase y plan gratuito</small></div></summary><ol><li>Las rutinas y fotografías necesarias para el operador tienen lectura pública mediante el enlace QR.</li><li>Crear, editar y eliminar información requiere una cuenta administradora activa.</li><li>Las auditorías, hallazgos y evidencias son información interna disponible únicamente para administradores.</li><li>Las fotografías se almacenan como documentos comprimidos en Firestore; no se utiliza Firebase Storage.</li><li>Para que los permisos coincidan con la aplicación, publica siempre el archivo <code>firestore.rules</code> actualizado en Firebase Console.</li></ol></details></section>`;
   $('#mainContent').innerHTML = page('Ayuda', 'Soporte', 'Información para usar la aplicación.', `<div class="help-grid"><article class="info-card"><h3>Cómo funciona</h3><p>${instructions}</p></article><article class="info-card"><h3>Conexión</h3><p>Necesitas conexión para consultar y guardar la información vigente.</p></article><article class="info-card"><h3>Acerca de</h3><p>Rutinas STC · HTML, CSS, JavaScript y Firebase.</p><span class="version-badge">Versión ${esc(window.APP_VERSION)}</span></article></div>${manual}`);
 }
@@ -452,17 +460,16 @@ async function render() {
   if (current.page === 'rutina' && current.id && !state.browsing && !state.admin) { state.browsing = true; showApp(); return; }
   if (!state.browsing && !state.admin) { showAccess(); return; }
   if (['admin', 'qr', 'auditorias', 'auditoria', 'auditoria-nueva'].includes(current.page) && !state.admin) { showAccess(); return; }
-  $('#sidebar').classList.remove('open');
-  const navigationPage = current.page.startsWith('auditoria') ? 'auditorias' : (current.page || 'home');
-  $$('#navigation a').forEach(link => link.classList.toggle('active', link.dataset.page === navigationPage));
   try {
     if (current.page === 'rutina' && current.id) await routine(decodeURIComponent(current.id));
+    else if (current.page === 'menu' && state.admin) adminMenu();
     else if (current.page === 'admin') await admin();
     else if (current.page === 'auditorias') await audits();
     else if (current.page === 'auditoria-nueva') await newAudit();
     else if (current.page === 'auditoria' && current.id) await auditDetail(decodeURIComponent(current.id));
     else if (current.page === 'qr') await qr();
     else if (current.page === 'help') help();
+    else if (state.admin) adminMenu();
     else await home();
   } catch (error) {
     console.error(error);
@@ -486,14 +493,12 @@ $('#loginForm').onsubmit = async event => {
     state.admin = true;
     state.browsing = false;
     $('#loginDialog').close();
-    location.hash = '#/admin';
+    location.hash = '#/menu';
     showApp();
   } catch (error) { toast(error.message, 'error'); }
   finally { busy(button, false); }
 };
 $('#logoutButton').onclick = async () => { state.browsing = false; state.admin = false; state.adminName = ''; await signOut(auth); location.hash = '#/'; showAccess(); };
-$('#menuButton').onclick = () => $('#sidebar').classList.add('open');
-$('#sidebarBackdrop').onclick = () => $('#sidebar').classList.remove('open');
 $('#machineForm').onsubmit = async event => {
   event.preventDefault();
   const form = new FormData(event.currentTarget);

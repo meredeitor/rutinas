@@ -140,3 +140,43 @@ body{background:radial-gradient(circle at 90% 0,rgba(0,112,218,.13),transparent 
 @media print{
   :root{color-scheme:light}.main-content{background:#fff}.qr-sticker,.qr-poster{color:#17251f}
 }
+/* Menú principal sin sidebar */
+.main-content{margin-left:0;padding:104px 28px 44px}
+.brand small{margin-left:2px;padding:4px 7px;border-radius:999px;background:rgba(34,127,234,.16);color:#8fc7ff;font-size:10px}
+.top-home{display:grid;place-items:center;text-decoration:none;font-size:23px;border:1px solid rgba(82,157,248,.28)!important;background:linear-gradient(145deg,#168dff,#075ad8)!important;color:#fff!important;box-shadow:0 8px 20px rgba(4,112,255,.25)}
+.logout-button{background:linear-gradient(145deg,#f65462,#c9293d)!important;color:#fff!important;border-color:rgba(255,133,144,.25)!important;box-shadow:0 8px 20px rgba(216,35,55,.23)}
+.main-menu-page{width:min(860px,100%)}
+.welcome-panel{position:relative;min-height:230px;padding:34px 36px;overflow:hidden;border:1px solid var(--line);border-radius:27px;background:radial-gradient(circle at 90% 10%,rgba(117,194,255,.25),transparent 30%),linear-gradient(135deg,#0f2340,#0b182b);box-shadow:0 18px 50px rgba(0,0,0,.2)}
+.welcome-panel:after{content:"";position:absolute;width:310px;height:310px;right:-105px;top:-155px;border-radius:50%;background:rgba(98,176,255,.12)}
+.welcome-panel h1{position:relative;z-index:1;margin:6px 0 14px;font-size:clamp(38px,7vw,62px);line-height:.96;letter-spacing:-.045em;color:#f7faff}
+.welcome-panel p:not(.eyebrow){position:relative;z-index:1;max-width:540px;margin:0;color:#a9bad0;font-size:17px;line-height:1.55}
+.welcome-decoration{position:absolute;z-index:1;right:42px;top:42px;color:#ffd86c;font-size:44px;filter:drop-shadow(0 8px 18px rgba(255,194,51,.28))}
+.main-menu-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:18px}
+.main-menu-card{min-height:116px;display:grid;grid-template-columns:64px 1fr 24px;align-items:center;gap:17px;padding:20px;border:1px solid var(--line);border-radius:22px;background:#0d192b;color:#eef5ff;text-decoration:none;box-shadow:0 12px 32px rgba(0,0,0,.16);transition:transform .18s ease,border-color .18s ease,box-shadow .18s ease}
+.main-menu-card:hover{transform:translateY(-2px);border-color:rgba(75,157,255,.48);box-shadow:0 18px 38px rgba(0,0,0,.24)}
+.main-menu-card>span:nth-child(2){display:flex;min-width:0;flex-direction:column}
+.main-menu-card strong{font-size:18px}.main-menu-card small{margin-top:5px;color:#91a4bb;font-size:12px;line-height:1.4}
+.main-menu-card>b{justify-self:end;color:#67b2ff;font-size:34px;font-weight:400}
+.main-menu-icon{width:62px;height:62px;display:grid;place-items:center;border-radius:18px;font-size:27px;font-weight:800}
+.main-menu-icon.blue{background:rgba(41,143,255,.17);color:#62b0ff}.main-menu-icon.mint{background:rgba(55,218,177,.16);color:#71e6c5}.main-menu-icon.amber{background:rgba(255,190,75,.16);color:#ffd077}.main-menu-icon.purple{background:rgba(170,126,255,.16);color:#c9a8ff}
+.main-menu-version{margin:20px 0 0;text-align:center;color:#66809d;font-size:11px}
+:root[data-theme="light"] .brand small{background:#e3f0fd;color:#176abf}
+:root[data-theme="light"] .welcome-panel{border-color:#d6e2ef;background:radial-gradient(circle at 90% 10%,#fff3ba,transparent 30%),linear-gradient(135deg,#fff,#eaf4ff);box-shadow:0 18px 45px rgba(32,70,112,.12)}
+:root[data-theme="light"] .welcome-panel h1{color:#10233d}
+:root[data-theme="light"] .welcome-panel p:not(.eyebrow){color:#61738a}
+:root[data-theme="light"] .welcome-panel:after{background:rgba(70,159,255,.1)}
+:root[data-theme="light"] .main-menu-card{border-color:#d8e3ef;background:#fff;color:#10233d;box-shadow:0 12px 30px rgba(32,70,112,.08)}
+:root[data-theme="light"] .main-menu-card small{color:#6b7c90}
+:root[data-theme="light"] .main-menu-version{color:#73869c}
+@media(max-width:700px){
+  .topbar{padding:0 14px}.brand strong{font-size:14px}.brand small{display:none}.top-actions{gap:7px}.top-actions .connection{display:none}.top-actions .icon-button{width:42px;height:42px}
+  .main-content{padding:88px 14px 30px}
+  .main-menu-page{max-width:560px}
+  .welcome-panel{min-height:225px;padding:30px 28px;border-radius:25px}
+  .welcome-panel h1{font-size:42px}.welcome-panel p:not(.eyebrow){max-width:320px;font-size:16px}
+  .welcome-decoration{right:26px;top:28px;font-size:36px}
+  .main-menu-grid{grid-template-columns:1fr;gap:13px;margin-top:15px}
+  .main-menu-card{min-height:104px;grid-template-columns:58px 1fr 20px;gap:14px;padding:17px;border-radius:20px}
+  .main-menu-icon{width:56px;height:56px;border-radius:17px;font-size:25px}
+  .main-menu-card strong{font-size:17px}.main-menu-card small{font-size:12px}
+}
