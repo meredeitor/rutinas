@@ -672,11 +672,16 @@ $('#machineForm').onsubmit = async event => {
   event.preventDefault();
   const form = new FormData(event.currentTarget);
   const button = $('button[type="submit"]', event.currentTarget);
+  const routineTemplateId = String(form.get('routineTemplateId')).trim();
+  const selectedTemplate = state.templates.find(template => template.id === routineTemplateId);
+  if (!selectedTemplate) { toast('Selecciona una plantilla válida.', 'error'); return; }
   const payload = {
+    name: selectedTemplate.name,
     plant: String(form.get('plant')).trim(),
     department: String(form.get('department')).trim(),
     assetNumber: String(form.get('assetNumber')).trim(),
-    routineTemplateId: String(form.get('routineTemplateId')).trim()
+    description: selectedTemplate.description,
+    routineTemplateId
   };
   busy(button, true, 'Guardando…');
   try {
