@@ -585,8 +585,9 @@ async function auditDetail(auditId) {
     findingCards.push(`<article class="finding-card" data-finding="${esc(finding.id)}"><header><span class="priority ${normalized(finding.priority)}">${esc(finding.priority)}</span><span class="audit-status ${auditStatusClass(finding.status)}">${esc(finding.status)}</span></header><h3>${esc(finding.activity)}</h3><p>${esc(finding.description)}</p><div class="finding-meta"><span><small>Responsable</small>${esc(finding.responsible)}</span><span><small>Fecha compromiso</small>${esc(finding.dueDate)}</span></div>${before || after ? `<div class="finding-images">${before ? `<figure><img src="${before}" alt="Evidencia inicial"><figcaption>Hallazgo</figcaption></figure>` : ''}${after ? `<figure><img src="${after}" alt="Evidencia de corrección"><figcaption>Corrección</figcaption></figure>` : ''}</div>` : ''}<div class="finding-followup audit-screen-only"><label>Estado<select name="status"><option${finding.status === 'Abierto' ? ' selected' : ''}>Abierto</option><option${finding.status === 'En proceso' ? ' selected' : ''}>En proceso</option><option${finding.status === 'Corregido' ? ' selected' : ''}>Corregido</option><option${finding.status === 'Verificado' ? ' selected' : ''}>Verificado</option><option${finding.status === 'Cerrado' ? ' selected' : ''}>Cerrado</option></select></label><label>Acción correctiva<textarea name="correctiveAction" rows="2" maxlength="1000">${esc(finding.correctiveAction || '')}</textarea></label><label>Evidencia de corrección<input name="afterEvidence" type="file" accept="image/png,image/jpeg,image/webp"></label><button class="button primary compact" type="button" data-save-finding="${esc(finding.id)}">Guardar seguimiento</button></div></article>`);
   }
   const report = `<section class="audit-report"><header class="report-header"><div><p>Sistema de Trabajo Caborca</p><h2>Reporte de auditoría semanal</h2></div><div class="report-score"><strong>${Number(audit.compliance)}%</strong><span>Cumplimiento</span></div></header><div class="report-machine"><div><small>Máquina</small><strong>${esc(audit.machineName)}</strong></div><div><small>Activo</small><strong>${esc(audit.assetNumber)}</strong></div><div><small>Planta</small><strong>${esc(audit.plant)}</strong></div><div><small>Departamento</small><strong>${esc(audit.department)}</strong></div><div><small>Semana</small><strong>${esc(audit.week)}</strong></div><div><small>Auditor</small><strong>${esc(audit.auditorName)}</strong></div></div><h3 class="report-section-title">Evaluación de actividades</h3><div class="table-wrap"><table class="audit-table"><thead><tr><th>#</th><th>Actividad</th><th>Resultado</th><th>Observación</th></tr></thead><tbody>${resultRows}</tbody></table></div><h3 class="report-section-title">Hallazgos y seguimiento</h3><div class="finding-list">${findingCards.join('') || '<div class="empty-state compact-empty">Sin hallazgos. La máquina cumple todas las actividades evaluadas.</div>'}</div><footer class="report-footer">Auditoría ${esc(audit.week)} · ${esc(audit.auditDate)} · Rutinas STC v${esc(window.APP_VERSION)}</footer></section>`;
-  $('#mainContent').innerHTML = `<section class="page audit-detail-page"><div class="page-heading audit-screen-only"><div><p class="eyebrow">Reporte</p><h2>${esc(audit.machineName)}</h2><p>${esc(audit.week)} · ${findings.length} hallazgo(s)</p></div><div class="heading-actions"><button id="printAudit" class="button primary">Imprimir reporte</button><a class="button secondary" href="#/auditorias">Volver</a></div></div>${report}</section>`;
+  $('#mainContent').innerHTML = `<section class="page audit-detail-page"><div class="page-heading audit-screen-only"><div><p class="eyebrow">Reporte</p><h2>${esc(audit.machineName)}</h2><p>${esc(audit.week)} · ${findings.length} hallazgo(s)</p></div><div class="heading-actions"><button id="printAudit" class="button primary">Imprimir reporte</button><a class="button secondary" href="#/auditoria-editar/${encodeURIComponent(auditId)}">Editar</a><button id="deleteAudit" class="button danger">Eliminar</button><a class="button secondary" href="#/auditorias">Volver</a></div></div>${report}</section>`;
   $('#printAudit').onclick = () => window.print();
+  $('#deleteAudit').onclick = () => deleteAudit(auditId, audit.machineName, $('#deleteAudit'));
   $$('[data-save-finding]').forEach(button => button.onclick = async () => {
     const card = button.closest('[data-finding]');
     const findingId = card.dataset.finding;
@@ -603,6 +604,83 @@ async function auditDetail(auditId) {
     } catch (error) { toast(`No se pudo actualizar: ${error.message}`, 'error'); busy(button, false); }
   });
 }
+async function deleteAudit(auditId, machineName, button) {
+  if (!confirm(`¿Eliminar definitivamente la auditoría de "${machineName}"? También se borrarán resultados, hallazgos y evidencias.`)) return;
+  busy(button, true, 'Eliminando…');
+  try {
+    const findings = await getDocs(collection(db, 'audits', auditId, 'findings'));
+    for (const finding of findings.docs) {
+      const images = await getDocs(collection(db, 'audits', auditId, 'findings', finding.id, 'images'));
+      for (const image of images.docs) await deleteDoc(image.ref);
+      await deleteDoc(finding.ref);
+    }
+    const results = await getDocs(collection(db, 'audits', auditId, 'results'));
+    for (const result of results.docs) await deleteDoc(result.ref);
+    await deleteDoc(doc(db, 'audits', auditId));
+    toast('Auditoría eliminada completamente.');
+    location.hash = '#/auditorias';
+  } catch (error) { toast(`No se pudo eliminar: ${error.message}`, 'error'); busy(button, false); }
+}
+async function editAudit(auditId) {
+  clearImages();
+  const snapshot = await getDoc(doc(db, 'audits', auditId));
+  if (!snapshot.exists()) { location.hash = '#/auditorias'; return; }
+  const audit = { id: snapshot.id, ...snapshot.data() };
+  const resultSnapshot = await getDocs(query(collection(db, 'audits', auditId, 'results'), orderBy('order')));
+  const results = resultSnapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+  const findingSnapshot = await getDocs(collection(db, 'audits', auditId, 'findings'));
+  const findings = findingSnapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+  const rows = results.map(item => {
+    const finding = findings.find(entry => entry.routineId === item.routineId);
+    const option = value => `<option${item.result === value ? ' selected' : ''}>${value}</option>`;
+    const priority = value => `<option${(finding?.priority || item.priority || 'Media') === value ? ' selected' : ''}>${value}</option>`;
+    return `<article class="audit-item${item.result === 'No cumple' ? ' noncompliant' : ''}" data-edit-audit-item data-result-id="${esc(item.id)}" data-routine-id="${esc(item.routineId)}" data-finding-id="${esc(finding?.id || '')}"><header><span class="audit-step">${Number(item.order)}</span><div><span class="badge">${esc(item.activityType || 'General')}</span><span class="frequency-chip">${esc(item.frequency)}</span><h3>${esc(item.activity)}</h3></div></header><div class="audit-item-fields"><label>Resultado<select name="result" required>${option('Cumple')}${option('No cumple')}${option('No aplica')}</select></label><label class="finding-only">Prioridad<select name="priority">${priority('Baja')}${priority('Media')}${priority('Alta')}${priority('Crítica')}</select></label><label class="span-2">Observación o hallazgo<textarea name="observation" rows="2" maxlength="1000">${esc(item.observation || finding?.description || '')}</textarea></label><label class="finding-only">Responsable<input name="responsible" maxlength="120" value="${esc(finding?.responsible || '')}"></label><label class="finding-only">Fecha compromiso<input name="dueDate" type="date" value="${esc(finding?.dueDate || '')}"></label><label class="span-2 finding-only">Reemplazar evidencia del hallazgo <small>Opcional · máximo final 180 KB.</small><input name="evidence" type="file" accept="image/png,image/jpeg,image/webp"></label></div></article>`;
+  }).join('');
+  const body = `<form id="editAuditForm"><div class="audit-batch-data"><label>Semana<input name="week" type="week" value="${esc(audit.week)}" required></label><label>Fecha de auditoría<input name="auditDate" type="date" value="${esc(audit.auditDate)}" required></label><div><strong>${esc(audit.machineName)}</strong><small>Activo ${esc(audit.assetNumber)} · La máquina y el auditor conservan su trazabilidad.</small></div></div><div class="audit-checklist">${rows}</div><div class="audit-submit"><button class="button primary big" type="submit">Guardar cambios</button><a class="button secondary big" href="#/auditoria/${encodeURIComponent(auditId)}">Cancelar</a></div></form>`;
+  $('#mainContent').innerHTML = page(`Editar · ${audit.machineName}`, 'Auditoría registrada', 'Actualiza resultados y hallazgos; el cumplimiento se recalculará automáticamente.', body);
+  $$('[name="result"]', $('#editAuditForm')).forEach(field => field.onchange = () => field.closest('[data-edit-audit-item]').classList.toggle('noncompliant', field.value === 'No cumple'));
+  $('#editAuditForm').onsubmit = async event => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const button = $('button[type="submit"]', form);
+    const edited = $$('[data-edit-audit-item]', form).map(item => ({
+      item, resultId: item.dataset.resultId, routineId: item.dataset.routineId, findingId: item.dataset.findingId,
+      result: $('[name="result"]', item).value, observation: $('[name="observation"]', item).value.trim(),
+      priority: $('[name="priority"]', item).value, responsible: $('[name="responsible"]', item).value.trim(),
+      dueDate: $('[name="dueDate"]', item).value, evidence: $('[name="evidence"]', item).files[0]
+    }));
+    const incomplete = edited.find(item => item.result === 'No cumple' && (!item.observation || !item.responsible || !item.dueDate));
+    if (incomplete) { toast('Todo incumplimiento necesita descripción, responsable y fecha compromiso.', 'error'); incomplete.item.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
+    busy(button, true, 'Guardando cambios…');
+    try {
+      for (const item of edited) {
+        await updateDoc(doc(db, 'audits', auditId, 'results', item.resultId), { result: item.result, observation: item.observation, priority: item.result === 'No cumple' ? item.priority : '', updatedAt: serverTimestamp() });
+        if (item.result === 'No cumple') {
+          let findingId = item.findingId;
+          const payload = { routineId: item.routineId, activity: results.find(entry => entry.id === item.resultId)?.activity || '', description: item.observation, priority: item.priority, responsible: item.responsible, dueDate: item.dueDate, updatedAt: serverTimestamp() };
+          if (findingId) await updateDoc(doc(db, 'audits', auditId, 'findings', findingId), payload);
+          else {
+            const created = await addDoc(collection(db, 'audits', auditId, 'findings'), { ...payload, activityType: results.find(entry => entry.id === item.resultId)?.activityType || 'General', status: 'Abierto', correctiveAction: '', createdAt: serverTimestamp() });
+            findingId = created.id;
+          }
+          if (item.evidence) await savePhoto(['audits', auditId, 'findings', findingId, 'images', 'before'], item.evidence);
+        } else if (item.findingId) {
+          const images = await getDocs(collection(db, 'audits', auditId, 'findings', item.findingId, 'images'));
+          for (const image of images.docs) await deleteDoc(image.ref);
+          await deleteDoc(doc(db, 'audits', auditId, 'findings', item.findingId));
+        }
+      }
+      const evaluated = edited.filter(item => item.result !== 'No aplica');
+      const compliant = edited.filter(item => item.result === 'Cumple').length;
+      const refreshedFindings = await getDocs(collection(db, 'audits', auditId, 'findings'));
+      const open = refreshedFindings.docs.filter(item => !['Cerrado', 'Verificado'].includes(item.data().status)).length;
+      const compliance = evaluated.length ? Math.round(compliant / evaluated.length * 100) : 100;
+      await updateDoc(doc(db, 'audits', auditId), { week: String(new FormData(form).get('week')), auditDate: String(new FormData(form).get('auditDate')), compliance, totalActivities: edited.length, compliantActivities: compliant, openFindings: open, status: open ? 'Con hallazgos' : (refreshedFindings.size ? 'Cerrada' : 'Completada'), updatedAt: serverTimestamp() });
+      toast('Auditoría actualizada.');
+      location.hash = `#/auditoria/${encodeURIComponent(auditId)}`;
+    } catch (error) { toast(`No se pudo actualizar: ${error.message}`, 'error'); busy(button, false); }
+  };
+}
 function help() {
   const instructions = state.admin ? 'Crea una máquina, agrega sus actividades y genera el QR para colocar en la estación.' : 'Escanea el QR de tu estación, sigue los pasos en orden y consulta las fotos si tienes dudas.';
   const manual = `<section class="help-manual"><div class="help-manual-heading"><p class="eyebrow">Manual de uso</p><h2>Todas las funciones de la aplicación</h2><p>Abre cada tema para consultar el procedimiento completo.</p></div>
@@ -615,7 +693,7 @@ function help() {
   <details><summary><span>06</span><div><strong>Auditorías semanales</strong><small>Evaluación de varias máquinas</small></div></summary><ol><li>Abre <b>Auditorías</b> y pulsa <b>Nueva auditoría</b>.</li><li>Selecciona Semana y Fecha de auditoría.</li><li>Busca y filtra las máquinas por Planta o Departamento.</li><li>Marca todas las máquinas de la jornada o utiliza <b>Seleccionar visibles</b>. También puedes quitar toda la selección.</li><li>Pulsa <b>Iniciar auditoría</b>. La aplicación presentará las máquinas una por una.</li><li>Las máquinas sin actividades serán omitidas y la aplicación continuará con la siguiente.</li><li>Evalúa cada actividad como <b>Cumple</b>, <b>No cumple</b> o <b>No aplica</b>.</li><li>La barra superior indica cuántas actividades faltan por evaluar.</li><li>Pulsa <b>Guardar y continuar</b> para registrar la máquina y avanzar a la siguiente.</li><li>Las máquinas seleccionadas juntas se agrupan en el historial como una misma Jornada de auditoría, pero conservan resultados y reportes independientes.</li></ol></details>
   <details><summary><span>07</span><div><strong>Hallazgos y evidencias</strong><small>Registro del incumplimiento</small></div></summary><ol><li>Al seleccionar <b>No cumple</b>, se habilitan Prioridad, Responsable, Fecha compromiso y Evidencia.</li><li>Describe claramente el hallazgo en Observación. La descripción, responsable y fecha son obligatorios para guardar un incumplimiento.</li><li>Selecciona prioridad Baja, Media, Alta o Crítica.</li><li>Adjunta una fotografía desde la galería o cámara. Se comprime automáticamente a WebP con límite de 180 KB.</li><li>La advertencia de residuos de la actividad también queda guardada en el resultado histórico.</li><li>El porcentaje se calcula dividiendo actividades cumplidas entre actividades evaluadas; las marcadas No aplica no afectan el resultado.</li></ol></details>
   <details><summary><span>08</span><div><strong>Seguimiento de hallazgos</strong><small>Corrección, verificación y cierre</small></div></summary><ol><li>Abre una auditoría desde el historial y localiza el hallazgo.</li><li>Cambia su estado entre Abierto, En proceso, Corregido, Verificado o Cerrado.</li><li>Captura la Acción correctiva realizada.</li><li>Adjunta una Evidencia de corrección para comparar el antes y después.</li><li>Pulsa <b>Guardar seguimiento</b>.</li><li>Un hallazgo deja de contarse como abierto cuando está Verificado o Cerrado.</li><li>Cuando todos los hallazgos están atendidos, la auditoría cambia automáticamente a Cerrada.</li></ol></details>
-  <details><summary><span>09</span><div><strong>Historial y reportes</strong><small>Consulta e impresión</small></div></summary><ol><li>La pantalla de Auditorías muestra cantidad realizada, cumplimiento promedio y hallazgos abiertos.</li><li>Las tarjetas se agrupan por Jornada de auditoría y muestran máquina, activo, resultado y hallazgos pendientes.</li><li>Pulsa <b>Ver auditoría</b> para abrir el reporte detallado.</li><li>El reporte conserva una copia histórica de máquina, planta, departamento, actividades, tipos, advertencias y auditor.</li><li>Revisa la evaluación, observaciones, hallazgos, responsables, fechas y fotografías.</li><li>Pulsa <b>Imprimir reporte</b> para obtener una versión preparada para hoja A4.</li></ol></details>
+  <details><summary><span>09</span><div><strong>Historial y reportes</strong><small>Consulta, edición e impresión</small></div></summary><ol><li>La pantalla de Auditorías muestra cantidad realizada, cumplimiento promedio y hallazgos abiertos.</li><li>Las tarjetas se agrupan por Jornada de auditoría y muestran máquina, activo, resultado y hallazgos pendientes.</li><li>Pulsa <b>Ver auditoría</b> para abrir el reporte detallado.</li><li>Usa <b>Editar</b> para corregir semana, fecha, resultados, observaciones, prioridad, responsable, compromiso o evidencia. El cumplimiento y los hallazgos se recalculan automáticamente.</li><li>Usa <b>Eliminar</b> para borrar definitivamente la auditoría junto con resultados, hallazgos y fotografías; la aplicación solicitará confirmación.</li><li>El reporte conserva una copia histórica de máquina, planta, departamento, actividades, tipos, advertencias y auditor.</li><li>Pulsa <b>Imprimir reporte</b> para obtener una versión preparada para hoja A4.</li></ol></details>
   <details><summary><span>10</span><div><strong>Búsqueda y filtros</strong><small>Localización rápida</small></div></summary><ol><li>El buscador reconoce nombre de máquina, número de activo, descripción, planta y departamento.</li><li>Combina el texto con los filtros de Planta y Departamento.</li><li>El contador indica cuántas máquinas coinciden.</li><li>Pulsa <b>Limpiar filtros</b> para restaurar la lista completa.</li><li>Los filtros están disponibles en Administración, Códigos QR y selección de máquinas para auditoría.</li></ol></details>
   <details><summary><span>11</span><div><strong>Conexión y actualización</strong><small>Funciones de la PWA</small></div></summary><ol><li>El indicador superior muestra si la aplicación está En línea o Sin conexión.</li><li>Se necesita conexión para leer o guardar la información vigente de Firebase.</li><li>El Service Worker conserva los archivos principales de la interfaz y cambia de caché con cada versión.</li><li>La versión instalada aparece en la pantalla inicial, en el menú principal y en Ayuda → Acerca de.</li><li>Si una actualización no aparece inmediatamente, cierra y vuelve a abrir la PWA o recarga la página.</li></ol></details>
   <details><summary><span>12</span><div><strong>Seguridad y almacenamiento</strong><small>Firebase y plan gratuito</small></div></summary><ol><li>Las rutinas y fotografías necesarias para el operador tienen lectura pública mediante el enlace QR.</li><li>Crear, editar y eliminar información requiere una cuenta administradora activa.</li><li>Las auditorías, hallazgos y evidencias son información interna disponible únicamente para administradores.</li><li>Las fotografías se almacenan como documentos comprimidos en Firestore; no se utiliza Firebase Storage.</li><li>Para que los permisos coincidan con la aplicación, publica siempre el archivo <code>firestore.rules</code> actualizado en Firebase Console.</li></ol></details></section>`;
@@ -625,7 +703,7 @@ async function render() {
   const current = route();
   if (current.page === 'rutina' && current.id && !state.browsing && !state.admin) { state.browsing = true; showApp(); return; }
   if (!state.browsing && !state.admin) { showAccess(); return; }
-  if (['admin', 'plantillas', 'plantilla', 'plantilla-asignar', 'qr', 'auditorias', 'auditoria', 'auditoria-nueva'].includes(current.page) && !state.admin) { showAccess(); return; }
+  if (['admin', 'plantillas', 'plantilla', 'plantilla-asignar', 'qr', 'auditorias', 'auditoria', 'auditoria-editar', 'auditoria-nueva'].includes(current.page) && !state.admin) { showAccess(); return; }
   try {
     if (current.page === 'rutina' && current.id) await routine(decodeURIComponent(current.id));
     else if (current.page === 'menu' && state.admin) adminMenu();
@@ -636,6 +714,7 @@ async function render() {
     else if (current.page === 'auditorias') await audits();
     else if (current.page === 'auditoria-nueva') await newAudit();
     else if (current.page === 'auditoria' && current.id) await auditDetail(decodeURIComponent(current.id));
+    else if (current.page === 'auditoria-editar' && current.id) await editAudit(decodeURIComponent(current.id));
     else if (current.page === 'qr') await qr();
     else if (current.page === 'help') help();
     else if (state.admin) adminMenu();
