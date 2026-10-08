@@ -420,6 +420,22 @@ async function saveResultEvidence(reference, file) {
   const image = await optimize(file);
   await updateDoc(reference, { evidenceFile: Bytes.fromUint8Array(new Uint8Array(await image.arrayBuffer())), evidenceMimeType: 'image/webp', updatedAt: serverTimestamp() });
 }
+function evidencePicker(hasEvidence = false) {
+  return `<div class="evidence-picker"><span class="evidence-title">${hasEvidence ? 'Reemplazar foto de evidencia' : 'Foto de evidencia'} <small>Opcional · máximo final 180 KB.</small></span><div class="evidence-actions"><label class="evidence-action camera">📷 Tomar foto<input name="evidenceCamera" type="file" accept="image/*" capture="environment"></label><label class="evidence-action gallery">🖼 Elegir de galería<input name="evidenceGallery" type="file" accept="image/png,image/jpeg,image/webp"></label></div><span class="evidence-selected" aria-live="polite">Ninguna imagen seleccionada</span></div>`;
+}
+function selectedEvidence(container) {
+  return $('[name="evidenceCamera"]', container)?.files[0] || $('[name="evidenceGallery"]', container)?.files[0];
+}
+function bindEvidencePickers(root) {
+  $$('.evidence-picker', root).forEach(picker => {
+    const status = $('.evidence-selected', picker);
+    $$('input[type="file"]', picker).forEach(input => input.onchange = () => {
+      if (!input.files[0]) return;
+      $$('input[type="file"]', picker).filter(other => other !== input).forEach(other => { other.value = ''; });
+      status.textContent = input.files[0].name;
+    });
+  });
+}
 async function qr() {
   clearImages();
   await Promise.all([loadMachines(), loadTemplates()]);
@@ -521,10 +537,11 @@ async function auditChecklist(machineId, week, auditDate) {
     location.hash = '#/auditorias';
     return;
   }
-  const rows = routines.map((item, index) => `<article class="audit-item" data-audit-item data-routine-id="${esc(item.id)}" data-activity-type="${esc(item.activityType || 'General')}" data-activity="${esc(item.activity)}" data-frequency="${esc(item.frequency)}" data-material="${esc(item.material || '')}" data-ppe="${esc(item.ppe || '')}" data-waste="${esc(item.waste || '')}" data-order="${Number(item.order) || index + 1}"><header><span class="audit-step">${Number(item.order) || index + 1}</span><div><span class="badge">${esc(item.activityType || 'General')}</span><span class="frequency-chip">${esc(item.frequency)}</span><h3>${esc(item.activity)}</h3></div></header>${item.waste ? `<div class="audit-warning"><strong>⚠ Residuos / advertencia</strong><span>${esc(item.waste)}</span></div>` : ''}<div class="audit-item-fields"><label>Resultado<select name="result" required><option value="">Seleccionar</option><option value="Cumple">Cumple</option><option value="No cumple">No cumple</option><option value="No aplica">No aplica</option></select></label><label class="finding-only">Prioridad<select name="priority"><option value="Media">Media</option><option value="Baja">Baja</option><option value="Alta">Alta</option><option value="Crítica">Crítica</option></select></label><label class="span-2">Observación o hallazgo<textarea name="observation" rows="2" maxlength="1000" placeholder="Describe lo observado"></textarea></label><label class="finding-only">Responsable<input name="responsible" maxlength="120" placeholder="Nombre o área responsable"></label><label class="finding-only">Fecha compromiso<input name="dueDate" type="date"></label><label class="span-2">Foto de evidencia <small>Opcional para cualquier resultado · máximo final 180 KB.</small><input name="evidence" type="file" accept="image/png,image/jpeg,image/webp"></label></div></article>`).join('');
+  const rows = routines.map((item, index) => `<article class="audit-item" data-audit-item data-routine-id="${esc(item.id)}" data-activity-type="${esc(item.activityType || 'General')}" data-activity="${esc(item.activity)}" data-frequency="${esc(item.frequency)}" data-material="${esc(item.material || '')}" data-ppe="${esc(item.ppe || '')}" data-waste="${esc(item.waste || '')}" data-order="${Number(item.order) || index + 1}"><header><span class="audit-step">${Number(item.order) || index + 1}</span><div><span class="badge">${esc(item.activityType || 'General')}</span><span class="frequency-chip">${esc(item.frequency)}</span><h3>${esc(item.activity)}</h3></div></header>${item.waste ? `<div class="audit-warning"><strong>⚠ Residuos / advertencia</strong><span>${esc(item.waste)}</span></div>` : ''}<div class="audit-item-fields"><label>Resultado<select name="result" required><option value="">Seleccionar</option><option value="Cumple">Cumple</option><option value="No cumple">No cumple</option><option value="No aplica">No aplica</option></select></label><label class="finding-only">Prioridad<select name="priority"><option value="Media">Media</option><option value="Baja">Baja</option><option value="Alta">Alta</option><option value="Crítica">Crítica</option></select></label><label class="span-2">Observación o hallazgo<textarea name="observation" rows="2" maxlength="1000" placeholder="Describe lo observado"></textarea></label><label class="finding-only">Responsable<input name="responsible" maxlength="120" placeholder="Nombre o área responsable"></label><label class="finding-only">Fecha compromiso<input name="dueDate" type="date"></label>${evidencePicker()}</div></article>`).join('');
   const batchPosition = state.auditBatch ? `Máquina ${state.auditBatch.current + 1} de ${state.auditBatch.machineIds.length} · ` : '';
   $('#mainContent').innerHTML = page(`Auditar · ${info.name}`, `${machine.plant} · ${machine.department}`, `${batchPosition}Semana ${week} · Activo ${machine.assetNumber}`, `<form id="auditForm"><div class="audit-progress"><strong id="auditAnswered">0 de ${routines.length} evaluadas</strong><span><i id="auditProgressBar"></i></span></div><div class="audit-checklist">${rows}</div><div class="audit-submit"><button class="button primary big" type="submit">Guardar y continuar</button><a class="button secondary big" href="#/auditorias">Cancelar lote</a></div></form>`);
   const form = $('#auditForm');
+  bindEvidencePickers(form);
   const refresh = () => {
     const answered = $$('[name="result"]', form).filter(field => field.value).length;
     $('#auditAnswered').textContent = `${answered} de ${routines.length} evaluadas`;
@@ -540,7 +557,7 @@ async function auditChecklist(machineId, week, auditDate) {
     const button = $('button[type="submit"]', form);
     const results = $$('[data-audit-item]', form).map(item => {
       const result = $('[name="result"]', item).value;
-      return { item, routineId: item.dataset.routineId, activityType: item.dataset.activityType, activity: item.dataset.activity, frequency: item.dataset.frequency, material: item.dataset.material, ppe: item.dataset.ppe, waste: item.dataset.waste, order: Number(item.dataset.order), result, observation: $('[name="observation"]', item).value.trim(), priority: $('[name="priority"]', item).value, responsible: $('[name="responsible"]', item).value.trim(), dueDate: $('[name="dueDate"]', item).value, evidence: $('[name="evidence"]', item).files[0] };
+      return { item, routineId: item.dataset.routineId, activityType: item.dataset.activityType, activity: item.dataset.activity, frequency: item.dataset.frequency, material: item.dataset.material, ppe: item.dataset.ppe, waste: item.dataset.waste, order: Number(item.dataset.order), result, observation: $('[name="observation"]', item).value.trim(), priority: $('[name="priority"]', item).value, responsible: $('[name="responsible"]', item).value.trim(), dueDate: $('[name="dueDate"]', item).value, evidence: selectedEvidence(item) };
     });
     if (results.some(item => !item.result)) { toast('Evalúa todas las actividades antes de finalizar.', 'error'); return; }
     const incomplete = results.find(item => item.result === 'No cumple' && (!item.observation || !item.responsible || !item.dueDate));
@@ -640,10 +657,11 @@ async function editAudit(auditId) {
     const finding = findings.find(entry => entry.routineId === item.routineId);
     const option = value => `<option${item.result === value ? ' selected' : ''}>${value}</option>`;
     const priority = value => `<option${(finding?.priority || item.priority || 'Media') === value ? ' selected' : ''}>${value}</option>`;
-    return `<article class="audit-item${item.result === 'No cumple' ? ' noncompliant' : ''}" data-edit-audit-item data-result-id="${esc(item.id)}" data-routine-id="${esc(item.routineId)}" data-finding-id="${esc(finding?.id || '')}"><header><span class="audit-step">${Number(item.order)}</span><div><span class="badge">${esc(item.activityType || 'General')}</span><span class="frequency-chip">${esc(item.frequency)}</span><h3>${esc(item.activity)}</h3></div></header><div class="audit-item-fields"><label>Resultado<select name="result" required>${option('Cumple')}${option('No cumple')}${option('No aplica')}</select></label><label class="finding-only">Prioridad<select name="priority">${priority('Baja')}${priority('Media')}${priority('Alta')}${priority('Crítica')}</select></label><label class="span-2">Observación o hallazgo<textarea name="observation" rows="2" maxlength="1000">${esc(item.observation || finding?.description || '')}</textarea></label><label class="finding-only">Responsable<input name="responsible" maxlength="120" value="${esc(finding?.responsible || '')}"></label><label class="finding-only">Fecha compromiso<input name="dueDate" type="date" value="${esc(finding?.dueDate || '')}"></label><label class="span-2">${item.evidenceFile ? 'Reemplazar foto de evidencia' : 'Foto de evidencia'} <small>Opcional para cualquier resultado · máximo final 180 KB.</small><input name="evidence" type="file" accept="image/png,image/jpeg,image/webp"></label></div></article>`;
+    return `<article class="audit-item${item.result === 'No cumple' ? ' noncompliant' : ''}" data-edit-audit-item data-result-id="${esc(item.id)}" data-routine-id="${esc(item.routineId)}" data-finding-id="${esc(finding?.id || '')}"><header><span class="audit-step">${Number(item.order)}</span><div><span class="badge">${esc(item.activityType || 'General')}</span><span class="frequency-chip">${esc(item.frequency)}</span><h3>${esc(item.activity)}</h3></div></header><div class="audit-item-fields"><label>Resultado<select name="result" required>${option('Cumple')}${option('No cumple')}${option('No aplica')}</select></label><label class="finding-only">Prioridad<select name="priority">${priority('Baja')}${priority('Media')}${priority('Alta')}${priority('Crítica')}</select></label><label class="span-2">Observación o hallazgo<textarea name="observation" rows="2" maxlength="1000">${esc(item.observation || finding?.description || '')}</textarea></label><label class="finding-only">Responsable<input name="responsible" maxlength="120" value="${esc(finding?.responsible || '')}"></label><label class="finding-only">Fecha compromiso<input name="dueDate" type="date" value="${esc(finding?.dueDate || '')}"></label>${evidencePicker(Boolean(item.evidenceFile))}</div></article>`;
   }).join('');
   const body = `<form id="editAuditForm"><div class="audit-batch-data"><label>Semana<input name="week" type="week" value="${esc(audit.week)}" required></label><label>Fecha de auditoría<input name="auditDate" type="date" value="${esc(audit.auditDate)}" required></label><div><strong>${esc(audit.machineName)}</strong><small>Activo ${esc(audit.assetNumber)} · La máquina y el auditor conservan su trazabilidad.</small></div></div><div class="audit-checklist">${rows}</div><div class="audit-submit"><button class="button primary big" type="submit">Guardar cambios</button><a class="button secondary big" href="#/auditoria/${encodeURIComponent(auditId)}">Cancelar</a></div></form>`;
   $('#mainContent').innerHTML = page(`Editar · ${audit.machineName}`, 'Auditoría registrada', 'Actualiza resultados y hallazgos; el cumplimiento se recalculará automáticamente.', body);
+  bindEvidencePickers($('#editAuditForm'));
   $$('[name="result"]', $('#editAuditForm')).forEach(field => field.onchange = () => field.closest('[data-edit-audit-item]').classList.toggle('noncompliant', field.value === 'No cumple'));
   $('#editAuditForm').onsubmit = async event => {
     event.preventDefault();
@@ -653,7 +671,7 @@ async function editAudit(auditId) {
       item, resultId: item.dataset.resultId, routineId: item.dataset.routineId, findingId: item.dataset.findingId,
       result: $('[name="result"]', item).value, observation: $('[name="observation"]', item).value.trim(),
       priority: $('[name="priority"]', item).value, responsible: $('[name="responsible"]', item).value.trim(),
-      dueDate: $('[name="dueDate"]', item).value, evidence: $('[name="evidence"]', item).files[0]
+      dueDate: $('[name="dueDate"]', item).value, evidence: selectedEvidence(item)
     }));
     const incomplete = edited.find(item => item.result === 'No cumple' && (!item.observation || !item.responsible || !item.dueDate));
     if (incomplete) { toast('Todo incumplimiento necesita descripción, responsable y fecha compromiso.', 'error'); incomplete.item.scrollIntoView({ behavior: 'smooth', block: 'center' }); return; }
