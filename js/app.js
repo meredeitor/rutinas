@@ -1,6 +1,6 @@
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-app.js';
 import { getAuth, onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-auth.js';
-import { getFirestore, collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, query, orderBy, setDoc, serverTimestamp, Bytes } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
+import { getFirestore, collection, doc, getDoc, getDocs, addDoc, updateDoc, deleteDoc, deleteField, query, orderBy, setDoc, serverTimestamp, Bytes } from 'https://www.gstatic.com/firebasejs/12.19.0/firebase-firestore.js';
 import { firebaseConfig } from './firebase-config.js';
 
 const app = initializeApp(firebaseConfig);
@@ -100,6 +100,14 @@ function routineOwner(machine) {
     ? { type: 'template', id: machine.routineTemplateId }
     : { type: 'machine', id: machine.id };
 }
+function machineInfo(machine) {
+  const template = state.templates.find(item => item.id === machine?.routineTemplateId);
+  return {
+    template,
+    name: template?.name || machine?.name || `Máquina ${machine?.assetNumber || ''}`.trim(),
+    description: template?.description || machine?.description || 'Sin descripción general'
+  };
+}
 function routineCollection(owner) {
   return owner.type === 'template'
     ? collection(db, 'routineTemplates', owner.id, 'routines')
@@ -153,10 +161,11 @@ function adminMenu() {
 }
 async function home() {
   clearImages();
-  await loadMachines();
+  await Promise.all([loadMachines(), loadTemplates()]);
   const cards = await Promise.all(state.machines.map(async machine => {
+    const info = machineInfo(machine);
     const photo = await imageAt('machines', machine.id, 'images', 'cover');
-    return `<article class="machine-card"><div class="machine-art">${photo ? `<img src="${photo}" alt="Foto de ${esc(machine.name)}" loading="lazy">` : '⚙'}</div><div class="machine-body"><p class="eyebrow">${esc(machine.plant)} · ${esc(machine.department)}</p><h3>${esc(machine.name)}</h3><div class="machine-model">Activo: ${esc(machine.assetNumber)}</div><p class="machine-review">${esc(machine.description)}</p><div class="machine-footer"><span class="machine-availability">Rutina vigente</span><a class="button primary compact" href="#/rutina/${encodeURIComponent(machine.id)}">Ver rutina</a></div></div></article>`;
+    return `<article class="machine-card"><div class="machine-art">${photo ? `<img src="${photo}" alt="Foto de ${esc(info.name)}" loading="lazy">` : '⚙'}</div><div class="machine-body"><p class="eyebrow">${esc(machine.plant)} · ${esc(machine.department)}</p><h3>${esc(info.name)}</h3><div class="machine-model">Activo: ${esc(machine.assetNumber)}</div><p class="machine-review">${esc(info.description)}</p><div class="machine-footer"><span class="machine-availability">Rutina vigente</span><a class="button primary compact" href="#/rutina/${encodeURIComponent(machine.id)}">Ver rutina</a></div></div></article>`;
   }));
   $('#mainContent').innerHTML = `<section class="page"><div class="hero"><div><p class="eyebrow light">Mantenimiento autónomo</p><h2>Consulta tu rutina</h2><p>Selecciona la máquina o escanea el código QR de tu estación.</p></div><div class="hero-icon">⚙</div></div><div class="machine-grid" style="margin-top:24px">${cards.join('') || '<div class="empty-state">Aún no hay máquinas publicadas.</div>'}</div></section>`;
 }
@@ -168,6 +177,11 @@ async function routine(machineId) {
     return;
   }
   const machine = snapshot.data();
+  if (machine.routineTemplateId && !state.templates.some(item => item.id === machine.routineTemplateId)) {
+    const templateSnapshot = await getDoc(doc(db, 'routineTemplates', machine.routineTemplateId));
+    if (templateSnapshot.exists()) state.templates.push({ id: templateSnapshot.id, ...templateSnapshot.data() });
+  }
+  const info = machineInfo({ id: machineId, ...machine });
   const owner = routineOwner({ id: machineId, ...machine });
   const items = await loadRoutines(owner);
   const groups = new Map();
@@ -181,30 +195,31 @@ async function routine(machineId) {
     }
     cards += '</div></section>';
   }
-  $('#mainContent').innerHTML = page(machine.name, 'Rutina de mantenimiento', `${machine.plant} · ${machine.department} · Activo ${machine.assetNumber}`, cards || '<div class="empty-state">Esta máquina aún no tiene actividades.</div>', '<a class="button secondary" href="#/">Volver</a>');
+  $('#mainContent').innerHTML = page(info.name, 'Rutina de mantenimiento', `${machine.plant} · ${machine.department} · Activo ${machine.assetNumber}`, `<p class="machine-routine-description">${esc(info.description)}</p>${cards || '<div class="empty-state">Esta máquina aún no tiene actividades.</div>'}`, '<a class="button secondary" href="#/">Volver</a>');
 }
 async function admin() {
   clearImages();
   await Promise.all([loadMachines(), loadTemplates()]);
   const cards = await Promise.all(state.machines.map(async machine => {
     const photo = await imageAt('machines', machine.id, 'images', 'cover');
-    const template = state.templates.find(item => item.id === machine.routineTemplateId);
+    const info = machineInfo(machine);
+    const template = info.template;
     const routineAction = template
       ? `<a class="button primary compact" href="#/plantilla/${encodeURIComponent(template.id)}">Ver plantilla</a><button class="button secondary compact" data-unassign-template="${esc(machine.id)}">Desvincular</button>`
       : `<button class="button primary compact" data-routines="${esc(machine.id)}">Actividades</button>`;
-    return `<article class="machine-card admin-machine-card" data-machine-card data-plant="${esc(machine.plant)}" data-department="${esc(machine.department)}" data-search="${esc(`${machine.name} ${machine.assetNumber} ${machine.description} ${machine.plant} ${machine.department} ${template?.name || ''}`)}"><div class="machine-art">${photo ? `<img src="${photo}" alt="Foto de ${esc(machine.name)}" loading="lazy">` : '⚙'}</div><div class="machine-body"><p class="eyebrow">${esc(machine.plant)} · ${esc(machine.department)}</p><h3>${esc(machine.name)}</h3><div class="machine-model">Activo: ${esc(machine.assetNumber)}</div>${template ? `<span class="template-chip">Plantilla: ${esc(template.name)}</span>` : '<span class="template-chip independent">Rutina independiente</span>'}<p class="machine-review">${esc(machine.description)}</p><div class="admin-machine-actions"><button class="button secondary compact" data-edit-machine="${esc(machine.id)}">Editar</button>${routineAction}<button class="button danger compact" data-delete-machine="${esc(machine.id)}">Eliminar</button></div></div></article>`;
+    return `<article class="machine-card admin-machine-card" data-machine-card data-plant="${esc(machine.plant)}" data-department="${esc(machine.department)}" data-search="${esc(`${info.name} ${machine.assetNumber} ${info.description} ${machine.plant} ${machine.department}`)}"><div class="machine-art">${photo ? `<img src="${photo}" alt="Foto de ${esc(info.name)}" loading="lazy">` : '⚙'}</div><div class="machine-body"><p class="eyebrow">${esc(machine.plant)} · ${esc(machine.department)}</p><h3>${esc(info.name)}</h3><div class="machine-model">Activo: ${esc(machine.assetNumber)}</div>${template ? `<span class="template-chip">Plantilla: ${esc(template.name)}</span>` : '<span class="template-chip independent">Rutina independiente heredada</span>'}<p class="machine-review">${esc(info.description)}</p><div class="admin-machine-actions"><button class="button secondary compact" data-edit-machine="${esc(machine.id)}">Editar</button>${routineAction}<button class="button danger compact" data-delete-machine="${esc(machine.id)}">Eliminar</button></div></div></article>`;
   }));
   $('#mainContent').innerHTML = page('Administrar máquinas', 'Inventario', 'Agrega, edita o elimina máquinas y sus actividades.', `${state.machines.length ? machineFilterMarkup() : ''}<div class="admin-machine-grid">${cards.join('') || '<div class="empty-state">Aún no hay máquinas. Agrega la primera.</div>'}</div>${state.machines.length ? '<div id="machineFilterEmpty" class="empty-state" hidden>No se encontraron máquinas con esos filtros.</div>' : ''}`, '<button id="newMachine" class="button primary">＋ Agregar máquina</button>');
   if (state.machines.length) bindMachineFilters('[data-machine-card]');
-  $('#newMachine').onclick = () => machineModal();
+  $('#newMachine').onclick = () => state.templates.length ? machineModal() : toast('Primero crea una plantilla de rutina.', 'error');
   $$('[data-edit-machine]').forEach(button => button.onclick = () => machineModal(state.machines.find(item => item.id === button.dataset.editMachine)));
   $$('[data-routines]').forEach(button => button.onclick = () => routineAdmin(state.machines.find(item => item.id === button.dataset.routines)));
   $$('[data-unassign-template]').forEach(button => button.onclick = async () => {
     const machine = state.machines.find(item => item.id === button.dataset.unassignTemplate);
-    if (!machine || !confirm(`¿Desvincular a "${machine.name}" de su plantilla? La máquina volverá a usar su rutina independiente.`)) return;
+    if (!machine || !confirm(`¿Desvincular a "${machineInfo(machine).name}" de su plantilla? La máquina volverá a usar su rutina independiente.`)) return;
     busy(button, true, 'Desvinculando…');
     try {
-      await updateDoc(doc(db, 'machines', machine.id), { routineTemplateId: '' });
+      await updateDoc(doc(db, 'machines', machine.id), { routineTemplateId: deleteField() });
       await admin();
       toast('Máquina desvinculada de la plantilla.');
     } catch (error) { toast(`No se pudo desvincular: ${error.message}`, 'error'); busy(button, false); }
@@ -213,7 +228,7 @@ async function admin() {
 }
 async function deleteMachine(machine, button) {
   if (!state.admin || !machine) return;
-  if (!confirm(`¿Eliminar la máquina "${machine.name}" y todas sus actividades y fotos? Esta acción no se puede deshacer.`)) return;
+  if (!confirm(`¿Eliminar la máquina "${machineInfo(machine).name}" y todas sus actividades y fotos? Esta acción no se puede deshacer.`)) return;
   busy(button, true, 'Eliminando…');
   try {
     const routines = await getDocs(collection(db, 'machines', machine.id, 'routines'));
@@ -232,10 +247,11 @@ async function deleteMachine(machine, button) {
 async function routineAdmin(machine) {
   if (!machine) return admin();
   if (machine.routineTemplateId) { location.hash = `#/plantilla/${encodeURIComponent(machine.routineTemplateId)}`; return; }
+  const info = machineInfo(machine);
   const owner = { type: 'machine', id: machine.id };
   const routines = await loadRoutines(owner);
   const cards = routines.map(item => `<article class="list-card"><div><span class="badge">${esc(item.activityType || 'General')}</span><h3>${esc(item.activity)}</h3><p>${esc(item.frequency)} · ${esc(item.material || 'Sin material')}</p></div><div><small>Orden</small><p>${Number(item.order) || 1}</p></div><div class="list-actions"><button class="button secondary compact" data-edit-routine="${esc(item.id)}">Editar</button><button class="button danger compact" data-delete-routine="${esc(item.id)}">Eliminar</button></div></article>`).join('');
-  $('#mainContent').innerHTML = page(`Actividades · ${machine.name}`, 'Rutina independiente', 'Organiza los pasos que verá el operador o conviértelos en una plantilla maestra.', `<div class="card-list">${cards || '<div class="empty-state">No hay actividades registradas.</div>'}</div>`, '<button id="newRoutine" class="button primary">＋ Agregar actividad</button><button id="convertRoutine" class="button secondary">Crear plantilla desde esta rutina</button><button id="backAdmin" class="button secondary">Volver</button>');
+  $('#mainContent').innerHTML = page(`Actividades · ${info.name}`, 'Rutina independiente heredada', 'Organiza los pasos que verá el operador o conviértelos en una plantilla maestra.', `<div class="card-list">${cards || '<div class="empty-state">No hay actividades registradas.</div>'}</div>`, '<button id="newRoutine" class="button primary">＋ Agregar actividad</button><button id="convertRoutine" class="button secondary">Crear plantilla desde esta rutina</button><button id="backAdmin" class="button secondary">Volver</button>');
   $('#newRoutine').onclick = () => routineModal(owner);
   $('#convertRoutine').onclick = () => convertMachineRoutine(machine, routines, $('#convertRoutine'));
   $('#backAdmin').onclick = admin;
@@ -290,7 +306,7 @@ async function assignTemplate(templateId) {
   await Promise.all([loadMachines(), loadTemplates()]);
   const template = state.templates.find(item => item.id === templateId);
   if (!template) { location.hash = '#/plantillas'; return; }
-  const cards = state.machines.map(machine => `<label class="qr-select-card template-machine-select" data-template-machine data-plant="${esc(machine.plant)}" data-department="${esc(machine.department)}" data-search="${esc(`${machine.name} ${machine.assetNumber} ${machine.description} ${machine.plant} ${machine.department}`)}"><input type="checkbox" value="${esc(machine.id)}" data-template-select${machine.routineTemplateId === template.id ? ' checked' : ''}><span class="qr-select-check">✓</span><div><p class="eyebrow">${esc(machine.plant)} · ${esc(machine.department)}</p><h3>${esc(machine.name)}</h3><p>Activo: ${esc(machine.assetNumber)}</p>${machine.routineTemplateId && machine.routineTemplateId !== template.id ? '<small>Actualmente usa otra plantilla</small>' : ''}</div></label>`).join('');
+  const cards = state.machines.map(machine => { const info = machineInfo(machine); return `<label class="qr-select-card template-machine-select" data-template-machine data-plant="${esc(machine.plant)}" data-department="${esc(machine.department)}" data-search="${esc(`${info.name} ${machine.assetNumber} ${info.description} ${machine.plant} ${machine.department}`)}"><input type="checkbox" value="${esc(machine.id)}" data-template-select${machine.routineTemplateId === template.id ? ' checked' : ''}><span class="qr-select-check">✓</span><div><p class="eyebrow">${esc(machine.plant)} · ${esc(machine.department)}</p><h3>${esc(info.name)}</h3><p>Activo: ${esc(machine.assetNumber)}</p>${machine.routineTemplateId && machine.routineTemplateId !== template.id ? '<small>Actualmente usa otra plantilla</small>' : ''}</div></label>`; }).join('');
   const body = `${machineFilterMarkup()}<div class="audit-selection-actions"><button id="selectVisibleTemplates" class="button secondary" type="button">Seleccionar visibles</button><button id="clearTemplateSelection" class="button secondary" type="button">Quitar selección</button></div><div class="qr-select-grid">${cards}</div><div id="machineFilterEmpty" class="empty-state" hidden>No se encontraron máquinas con esos filtros.</div>`;
   $('#mainContent').innerHTML = page(`Asignar · ${template.name}`, 'Plantilla maestra', 'Selecciona las máquinas que compartirán esta rutina. Guardar reemplaza cualquier plantilla anterior de las seleccionadas.', body, '<button id="saveTemplateAssignment" class="button primary">Guardar asignación</button><a class="button secondary" href="#/plantillas">Volver</a>');
   bindMachineFilters('[data-template-machine]');
@@ -333,11 +349,12 @@ async function deleteTemplate(template, button) {
 }
 async function convertMachineRoutine(machine, routines, button) {
   if (!routines.length) { toast('Agrega al menos una actividad antes de crear la plantilla.', 'error'); return; }
-  const name = prompt('Nombre de la nueva plantilla:', machine.name);
+  const info = machineInfo(machine);
+  const name = prompt('Nombre de la nueva plantilla:', info.name);
   if (!name?.trim()) return;
   busy(button, true, 'Creando plantilla…');
   try {
-    const template = await addDoc(collection(db, 'routineTemplates'), { name: name.trim(), description: `Rutina maestra creada desde ${machine.name}`, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+    const template = await addDoc(collection(db, 'routineTemplates'), { name: name.trim(), description: info.description, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
     for (const item of routines) {
       const { id, ...data } = item;
       const target = await addDoc(collection(db, 'routineTemplates', template.id, 'routines'), data);
@@ -353,16 +370,16 @@ function machineModal(machine = {}) {
   const form = $('#machineForm');
   form.reset();
   form.elements.machineId.value = machine.id || '';
-  form.elements.name.value = machine.name || '';
   form.elements.plant.value = machine.plant || '';
   form.elements.department.value = machine.department || '';
   form.elements.assetNumber.value = machine.assetNumber || '';
-  form.elements.description.value = machine.description || '';
+  form.elements.routineTemplateId.innerHTML = `<option value="">Selecciona una plantilla</option>${state.templates.map(template => `<option value="${esc(template.id)}">${esc(template.name)}</option>`).join('')}`;
+  form.elements.routineTemplateId.value = machine.routineTemplateId || '';
   form.elements.photo.required = !machine.id;
   $('#machinePhotoHelp').textContent = machine.id
     ? 'Selecciona una imagen solamente si deseas reemplazar la foto actual.'
     : 'WebP, JPG o PNG. Máximo final: 180 KB.';
-  $('#machineDialogTitle').textContent = machine.id ? 'Editar máquina' : 'Agregar máquina';
+  $('#machineDialogTitle').textContent = machine.id ? 'Editar máquina física' : 'Agregar máquina física';
   $('#machineDialog').showModal();
 }
 function routineModal(owner, routine = {}) {
@@ -400,8 +417,8 @@ async function savePhoto(path, file) {
 }
 async function qr() {
   clearImages();
-  await loadMachines();
-  const cards = state.machines.map(machine => `<label class="qr-select-card" data-qr-machine data-plant="${esc(machine.plant)}" data-department="${esc(machine.department)}" data-search="${esc(`${machine.name} ${machine.assetNumber} ${machine.description} ${machine.plant} ${machine.department}`)}"><input type="checkbox" value="${esc(machine.id)}" data-qr-select><span class="qr-select-check">✓</span><div><p class="eyebrow">${esc(machine.plant)} · ${esc(machine.department)}</p><h3>${esc(machine.name)}</h3><p>Activo: ${esc(machine.assetNumber)}</p></div></label>`).join('');
+  await Promise.all([loadMachines(), loadTemplates()]);
+  const cards = state.machines.map(machine => { const info = machineInfo(machine); return `<label class="qr-select-card" data-qr-machine data-plant="${esc(machine.plant)}" data-department="${esc(machine.department)}" data-search="${esc(`${info.name} ${machine.assetNumber} ${info.description} ${machine.plant} ${machine.department}`)}"><input type="checkbox" value="${esc(machine.id)}" data-qr-select><span class="qr-select-check">✓</span><div><p class="eyebrow">${esc(machine.plant)} · ${esc(machine.department)}</p><h3>${esc(info.name)}</h3><p>Activo: ${esc(machine.assetNumber)}</p></div></label>`; }).join('');
   const actions = state.machines.length ? '<button id="selectAllQr" class="button secondary">Seleccionar visibles</button><button id="prepareQr" class="button primary" disabled>Preparar impresión</button>' : '';
   $('#mainContent').innerHTML = page('Códigos QR', 'Estaciones', 'Selecciona las máquinas que deseas imprimir. Se acomodarán hasta cuatro tarjetas diferentes por hoja.', `${state.machines.length ? machineFilterMarkup() : ''}<div class="qr-select-grid">${cards || '<div class="empty-state">Primero registra una máquina.</div>'}</div>${state.machines.length ? '<div id="machineFilterEmpty" class="empty-state" hidden>No se encontraron máquinas con esos filtros.</div>' : ''}`, actions);
   if (state.machines.length) bindMachineFilters('[data-qr-machine]');
@@ -418,8 +435,9 @@ async function qr() {
     const selectedMachines = state.machines.filter(machine => selectedIds.includes(machine.id));
     clearImages();
     const posters = await Promise.all(selectedMachines.map(async (machine, index) => {
+      const info = machineInfo(machine);
       const photo = await imageAt('machines', machine.id, 'images', 'cover');
-      return `<article class="qr-sticker"><header><div class="qr-sticker-brand"><span>⚙</span><div><strong>SISTEMA DE TRABAJO CABORCA</strong><small>MANTENIMIENTO AUTÓNOMO</small></div></div><b>RUTINA DIGITAL</b></header><section class="qr-sticker-machine">${photo ? `<img src="${photo}" alt="Foto de ${esc(machine.name)}">` : '<div class="qr-sticker-placeholder">⚙</div>'}<div><p>${esc(machine.plant)} · ${esc(machine.department)}</p><h2>${esc(machine.name)}</h2><span>ACTIVO: ${esc(machine.assetNumber)}</span></div></section><section class="qr-sticker-scan"><div><p>CONSULTA LA RUTINA VIGENTE</p><h3>Escanea con la cámara de tu teléfono</h3><span>Consulta actividades, materiales e indicaciones de seguridad.</span></div><div class="qr-sticker-code"><div id="qr-${index}"></div><strong>ESCANEA AQUÍ</strong></div></section><footer><span>SEGURIDAD · LIMPIEZA · CONSERVACIÓN</span><strong>SOMOS LO QUE HACEMOS</strong></footer></article>`;
+      return `<article class="qr-sticker"><header><div class="qr-sticker-brand"><span>⚙</span><div><strong>SISTEMA DE TRABAJO CABORCA</strong><small>MANTENIMIENTO AUTÓNOMO</small></div></div><b>RUTINA DIGITAL</b></header><section class="qr-sticker-machine">${photo ? `<img src="${photo}" alt="Foto de ${esc(info.name)}">` : '<div class="qr-sticker-placeholder">⚙</div>'}<div><p>${esc(machine.plant)} · ${esc(machine.department)}</p><h2>${esc(info.name)}</h2><span>ACTIVO: ${esc(machine.assetNumber)}</span></div></section><section class="qr-sticker-scan"><div><p>CONSULTA LA RUTINA VIGENTE</p><h3>Escanea con la cámara de tu teléfono</h3><span>Consulta actividades, materiales e indicaciones de seguridad.</span></div><div class="qr-sticker-code"><div id="qr-${index}"></div><strong>ESCANEA AQUÍ</strong></div></section><footer><span>SEGURIDAD · LIMPIEZA · CONSERVACIÓN</span><strong>SOMOS LO QUE HACEMOS</strong></footer></article>`;
     }));
     $('#mainContent').innerHTML = `<section class="page qr-print-page"><div class="page-heading qr-screen-only"><div><p class="eyebrow">Vista previa</p><h2>Tarjetas seleccionadas</h2><p>${selectedMachines.length} tarjeta${selectedMachines.length === 1 ? '' : 's'} · hasta 4 por hoja</p></div></div><div class="qr-sticker-grid">${posters.join('')}</div><div class="qr-screen-actions"><button id="printQr" class="button primary">Imprimir tarjetas</button><button id="backQr" class="button secondary">Volver a seleccionar</button></div></section>`;
     selectedMachines.forEach((machine, index) => {
@@ -458,9 +476,9 @@ async function audits() {
   $('#mainContent').innerHTML = page('Auditorías semanales', 'Mantenimiento', 'Evalúa el mantenimiento autónomo y da seguimiento a los hallazgos.', `${summary}<div class="audit-batches">${batches || '<div class="empty-state">Todavía no existen auditorías. Crea la primera.</div>'}</div>`, '<a class="button primary" href="#/auditoria-nueva">＋ Nueva auditoría</a>');
 }
 async function newAudit() {
-  await loadMachines();
+  await Promise.all([loadMachines(), loadTemplates()]);
   const today = new Date().toISOString().slice(0, 10);
-  const cards = state.machines.map(machine => `<label class="qr-select-card audit-machine-select" data-audit-machine data-plant="${esc(machine.plant)}" data-department="${esc(machine.department)}" data-search="${esc(`${machine.name} ${machine.assetNumber} ${machine.description} ${machine.plant} ${machine.department}`)}"><input type="checkbox" value="${esc(machine.id)}" data-audit-select><span class="qr-select-check">✓</span><div><p class="eyebrow">${esc(machine.plant)} · ${esc(machine.department)}</p><h3>${esc(machine.name)}</h3><p>Activo: ${esc(machine.assetNumber)}</p></div></label>`).join('');
+  const cards = state.machines.map(machine => { const info = machineInfo(machine); return `<label class="qr-select-card audit-machine-select" data-audit-machine data-plant="${esc(machine.plant)}" data-department="${esc(machine.department)}" data-search="${esc(`${info.name} ${machine.assetNumber} ${info.description} ${machine.plant} ${machine.department}`)}"><input type="checkbox" value="${esc(machine.id)}" data-audit-select><span class="qr-select-check">✓</span><div><p class="eyebrow">${esc(machine.plant)} · ${esc(machine.department)}</p><h3>${esc(info.name)}</h3><p>Activo: ${esc(machine.assetNumber)}</p></div></label>`; }).join('');
   const body = `<form id="auditSetupForm"><div class="audit-batch-data"><label>Semana<input name="week" type="week" value="${currentWeek()}" required></label><label>Fecha de auditoría<input name="auditDate" type="date" value="${today}" required></label><div><strong id="auditMachineCount">0 seleccionadas</strong><small>Cada máquina conservará su propio resultado.</small></div></div>${state.machines.length ? machineFilterMarkup() : ''}<div class="audit-selection-actions"><button id="selectVisibleAudits" class="button secondary" type="button">Seleccionar visibles</button><button id="clearAuditSelection" class="button secondary" type="button">Quitar selección</button></div><div class="qr-select-grid audit-machine-grid">${cards || '<div class="empty-state">Primero registra máquinas para poder auditarlas.</div>'}</div>${state.machines.length ? '<div id="machineFilterEmpty" class="empty-state" hidden>No se encontraron máquinas con esos filtros.</div>' : ''}<div class="audit-submit"><button id="startAuditBatch" class="button primary big" type="submit" disabled>Iniciar auditoría</button><a class="button secondary big" href="#/auditorias">Cancelar</a></div></form>`;
   $('#mainContent').innerHTML = page('Nueva auditoría', 'Evaluación semanal', 'Selecciona todas las máquinas que se revisarán durante esta jornada.', body, '<a class="button secondary" href="#/auditorias">Cancelar</a>');
   if (state.machines.length) bindMachineFilters('[data-audit-machine]');
@@ -486,9 +504,10 @@ async function newAudit() {
 async function auditChecklist(machineId, week, auditDate) {
   const machine = state.machines.find(item => item.id === machineId);
   if (!machine) return newAudit();
+  const info = machineInfo(machine);
   const routines = await loadRoutines(routineOwner(machine));
   if (!routines.length) {
-    toast(`${machine.name} no tiene actividades y fue omitida.`, 'error');
+    toast(`${info.name} no tiene actividades y fue omitida.`, 'error');
     if (state.auditBatch && state.auditBatch.current < state.auditBatch.machineIds.length - 1) {
       state.auditBatch.current += 1;
       return auditChecklist(state.auditBatch.machineIds[state.auditBatch.current], week, auditDate);
@@ -499,7 +518,7 @@ async function auditChecklist(machineId, week, auditDate) {
   }
   const rows = routines.map((item, index) => `<article class="audit-item" data-audit-item data-routine-id="${esc(item.id)}" data-activity-type="${esc(item.activityType || 'General')}" data-activity="${esc(item.activity)}" data-frequency="${esc(item.frequency)}" data-material="${esc(item.material || '')}" data-ppe="${esc(item.ppe || '')}" data-waste="${esc(item.waste || '')}" data-order="${Number(item.order) || index + 1}"><header><span class="audit-step">${Number(item.order) || index + 1}</span><div><span class="badge">${esc(item.activityType || 'General')}</span><span class="frequency-chip">${esc(item.frequency)}</span><h3>${esc(item.activity)}</h3></div></header>${item.waste ? `<div class="audit-warning"><strong>⚠ Residuos / advertencia</strong><span>${esc(item.waste)}</span></div>` : ''}<div class="audit-item-fields"><label>Resultado<select name="result" required><option value="">Seleccionar</option><option value="Cumple">Cumple</option><option value="No cumple">No cumple</option><option value="No aplica">No aplica</option></select></label><label class="finding-only">Prioridad<select name="priority"><option value="Media">Media</option><option value="Baja">Baja</option><option value="Alta">Alta</option><option value="Crítica">Crítica</option></select></label><label class="span-2">Observación o hallazgo<textarea name="observation" rows="2" maxlength="1000" placeholder="Describe lo observado"></textarea></label><label class="finding-only">Responsable<input name="responsible" maxlength="120" placeholder="Nombre o área responsable"></label><label class="finding-only">Fecha compromiso<input name="dueDate" type="date"></label><label class="span-2 finding-only">Evidencia del hallazgo <small>Máximo final 180 KB.</small><input name="evidence" type="file" accept="image/png,image/jpeg,image/webp"></label></div></article>`).join('');
   const batchPosition = state.auditBatch ? `Máquina ${state.auditBatch.current + 1} de ${state.auditBatch.machineIds.length} · ` : '';
-  $('#mainContent').innerHTML = page(`Auditar · ${machine.name}`, `${machine.plant} · ${machine.department}`, `${batchPosition}Semana ${week} · Activo ${machine.assetNumber}`, `<form id="auditForm"><div class="audit-progress"><strong id="auditAnswered">0 de ${routines.length} evaluadas</strong><span><i id="auditProgressBar"></i></span></div><div class="audit-checklist">${rows}</div><div class="audit-submit"><button class="button primary big" type="submit">Guardar y continuar</button><a class="button secondary big" href="#/auditorias">Cancelar lote</a></div></form>`);
+  $('#mainContent').innerHTML = page(`Auditar · ${info.name}`, `${machine.plant} · ${machine.department}`, `${batchPosition}Semana ${week} · Activo ${machine.assetNumber}`, `<form id="auditForm"><div class="audit-progress"><strong id="auditAnswered">0 de ${routines.length} evaluadas</strong><span><i id="auditProgressBar"></i></span></div><div class="audit-checklist">${rows}</div><div class="audit-submit"><button class="button primary big" type="submit">Guardar y continuar</button><a class="button secondary big" href="#/auditorias">Cancelar lote</a></div></form>`);
   const form = $('#auditForm');
   const refresh = () => {
     const answered = $$('[name="result"]', form).filter(field => field.value).length;
@@ -527,7 +546,7 @@ async function auditChecklist(machineId, week, auditDate) {
       const compliant = results.filter(item => item.result === 'Cumple').length;
       const findings = results.filter(item => item.result === 'No cumple');
       const compliance = evaluated.length ? Math.round(compliant / evaluated.length * 100) : 100;
-      const reference = await addDoc(collection(db, 'audits'), { batchId: state.auditBatch?.id || crypto.randomUUID(), machineId, machineName: machine.name, plant: machine.plant, department: machine.department, assetNumber: machine.assetNumber, week: String(week), auditDate: String(auditDate), auditorUid: state.user.uid, auditorName: state.adminName || state.user.email || 'Administrador', compliance, status: findings.length ? 'Con hallazgos' : 'Completada', totalActivities: results.length, compliantActivities: compliant, openFindings: findings.length, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      const reference = await addDoc(collection(db, 'audits'), { batchId: state.auditBatch?.id || crypto.randomUUID(), machineId, machineName: info.name, machineDescription: info.description, routineTemplateId: machine.routineTemplateId || '', plant: machine.plant, department: machine.department, assetNumber: machine.assetNumber, week: String(week), auditDate: String(auditDate), auditorUid: state.user.uid, auditorName: state.adminName || state.user.email || 'Administrador', compliance, status: findings.length ? 'Con hallazgos' : 'Completada', totalActivities: results.length, compliantActivities: compliant, openFindings: findings.length, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
       for (const item of results) {
         await addDoc(collection(db, 'audits', reference.id, 'results'), { routineId: item.routineId, activityType: item.activityType, activity: item.activity, frequency: item.frequency, material: item.material, ppe: item.ppe, waste: item.waste, order: item.order, result: item.result, observation: item.observation, priority: item.result === 'No cumple' ? item.priority : '', createdAt: serverTimestamp() });
         if (item.result === 'No cumple') {
@@ -588,8 +607,8 @@ function help() {
   const instructions = state.admin ? 'Crea una máquina, agrega sus actividades y genera el QR para colocar en la estación.' : 'Escanea el QR de tu estación, sigue los pasos en orden y consulta las fotos si tienes dudas.';
   const manual = `<section class="help-manual"><div class="help-manual-heading"><p class="eyebrow">Manual de uso</p><h2>Todas las funciones de la aplicación</h2><p>Abre cada tema para consultar el procedimiento completo.</p></div>
   <details open><summary><span>01</span><div><strong>Acceso y perfiles</strong><small>Operadores y administradores</small></div></summary><ol><li>En la pantalla inicial, pulsa <b>Consultar rutina</b> para entrar como operador sin iniciar sesión.</li><li>Pulsa <b>Acceso administrador</b> para gestionar máquinas, actividades, QR y auditorías.</li><li>Escribe el correo y contraseña registrados en Firebase Authentication.</li><li>La cuenta debe tener un documento en <code>usuarios/{uid}</code> con <code>rol: admin</code> y <code>estatus: activo</code>.</li><li>Si el perfil contiene el campo <code>nombre</code>, se mostrará en la bienvenida y en los reportes; de lo contrario se mostrará el correo.</li><li>Usa el botón de salida ubicado arriba a la derecha para cerrar la sesión de forma segura.</li></ol></details>
-  <details><summary><span>02</span><div><strong>Administrar máquinas</strong><small>Alta, edición y eliminación</small></div></summary><ol><li>Abre <b>Administrar máquinas</b> desde el menú.</li><li>Usa el buscador o filtra por Planta y Departamento para localizar un registro.</li><li>Pulsa <b>Agregar máquina</b> y captura Nombre, Planta, Departamento, No. de Activo, Foto y Descripción.</li><li>La foto se convierte automáticamente a WebP y se reduce a un máximo de 180 KB.</li><li>Pulsa <b>Editar</b> para cambiar los datos o reemplazar la fotografía.</li><li>Pulsa <b>Eliminar</b> para borrar la máquina, sus actividades y fotografías. Esta acción requiere confirmación y no se puede deshacer.</li></ol></details>
-  <details><summary><span>03</span><div><strong>Plantillas de rutina</strong><small>Una rutina para varias máquinas</small></div></summary><ol><li>Abre <b>Plantillas de rutina</b> desde el menú administrativo.</li><li>Crea una plantilla y captura su nombre y descripción.</li><li>Agrega o edita las actividades de la plantilla. Los cambios se reflejan automáticamente en todas las máquinas vinculadas.</li><li>Pulsa <b>Asignar máquinas</b>, usa el buscador y los filtros, selecciona las máquinas compatibles y guarda la asignación.</li><li>También puedes abrir la rutina independiente de una máquina y pulsar <b>Crear plantilla desde esta rutina</b>.</li><li>Desde Administrar máquinas puedes ver la plantilla asignada o desvincular la máquina.</li><li>Una plantilla no se puede eliminar mientras tenga máquinas vinculadas.</li></ol></details>
+  <details><summary><span>02</span><div><strong>Administrar máquinas</strong><small>Alta, edición y eliminación</small></div></summary><ol><li>Primero crea por lo menos una plantilla de rutina.</li><li>Abre <b>Administrar máquinas</b> y pulsa <b>Agregar máquina</b>.</li><li>Selecciona la plantilla y captura únicamente Planta, Departamento, No. de Activo y Foto.</li><li>El nombre, descripción y actividades se obtienen automáticamente de la plantilla para evitar doble captura.</li><li>La foto se convierte automáticamente a WebP y se reduce a un máximo de 180 KB.</li><li>Pulsa <b>Editar</b> para cambiar la ubicación, activo, fotografía o plantilla asignada.</li><li>Pulsa <b>Eliminar</b> para borrar la máquina física y su fotografía. La plantilla compartida no se elimina.</li></ol></details>
+  <details><summary><span>03</span><div><strong>Plantillas de rutina</strong><small>Una rutina para varias máquinas</small></div></summary><ol><li>Abre <b>Plantillas de rutina</b> desde el menú administrativo.</li><li>Crea una plantilla y captura una sola vez el nombre o modelo y la descripción general de la máquina.</li><li>Agrega o edita las actividades de la plantilla. Los cambios se reflejan automáticamente en todas las máquinas vinculadas.</li><li>Pulsa <b>Asignar máquinas</b>, usa el buscador y los filtros, selecciona las máquinas compatibles y guarda la asignación.</li><li>También puedes convertir una rutina independiente existente en plantilla.</li><li>Las tarjetas, QR y auditorías combinan nombre y descripción de la plantilla con planta, departamento, activo y foto de cada máquina física.</li><li>Una plantilla no se puede eliminar mientras tenga máquinas vinculadas.</li></ol></details>
   <details><summary><span>04</span><div><strong>Actividades de mantenimiento</strong><small>Construcción de la rutina</small></div></summary><ol><li>En una máquina independiente o plantilla, pulsa <b>Actividades</b>.</li><li>Agrega el Tipo de actividad, por ejemplo Limpieza, Lubricación, Inspección, Ajuste o Conservación. También puedes escribir otro tipo.</li><li>Captura la descripción de la actividad, Frecuencia, Orden, Material, Equipo de protección y Residuos / advertencia.</li><li>Agrega una fotografía de referencia cuando ayude al operador a identificar el punto de trabajo.</li><li>Usa el Orden para establecer la secuencia de los pasos.</li><li>Edita o elimina actividades desde la misma pantalla.</li><li>En la rutina del operador, las actividades se agrupan automáticamente en contenedores por Tipo de actividad.</li><li>Los registros antiguos sin tipo aparecen en el grupo <b>General</b> hasta que sean editados.</li></ol></details>
   <details><summary><span>05</span><div><strong>Consulta de rutina</strong><small>Uso del operador</small></div></summary><ol><li>El operador puede escanear el QR colocado en la máquina o entrar por <b>Consultar rutina</b>.</li><li>Si entra manualmente, selecciona la tarjeta de la máquina y pulsa <b>Ver rutina</b>.</li><li>Consulta los grupos de actividades y sigue los pasos en el orden indicado.</li><li>Cada actividad muestra frecuencia, material, equipo de protección, residuos o advertencias y fotografía de referencia.</li><li>El QR abre directamente la máquina correspondiente sin solicitar inicio de sesión.</li></ol></details>
   <details><summary><span>05</span><div><strong>Códigos QR e impresión</strong><small>Tarjetas para las máquinas</small></div></summary><ol><li>Abre <b>Códigos QR</b> desde el menú administrativo.</li><li>Busca una máquina o filtra por Planta y Departamento.</li><li>Marca una o varias máquinas. <b>Seleccionar visibles</b> marca solamente los resultados mostrados por los filtros.</li><li>Pulsa <b>Preparar impresión</b> para generar una tarjeta diferente por máquina.</li><li>Revisa la vista previa y pulsa <b>Imprimir tarjetas</b>.</li><li>La impresión acomoda hasta cuatro tarjetas por hoja A4, en una cuadrícula de 2 × 2. Las tarjetas adicionales continúan en páginas nuevas.</li><li>Pulsa <b>Volver a seleccionar</b> para modificar el conjunto antes de imprimir.</li></ol></details>
@@ -654,11 +673,10 @@ $('#machineForm').onsubmit = async event => {
   const form = new FormData(event.currentTarget);
   const button = $('button[type="submit"]', event.currentTarget);
   const payload = {
-    name: String(form.get('name')).trim(),
     plant: String(form.get('plant')).trim(),
     department: String(form.get('department')).trim(),
     assetNumber: String(form.get('assetNumber')).trim(),
-    description: String(form.get('description')).trim()
+    routineTemplateId: String(form.get('routineTemplateId')).trim()
   };
   busy(button, true, 'Guardando…');
   try {

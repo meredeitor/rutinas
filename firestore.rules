@@ -16,9 +16,6 @@ service cloud.firestore {
       return request.resource.data.keys().hasOnly([
           'name', 'plant', 'department', 'assetNumber', 'description', 'routineTemplateId'
         ])
-        && request.resource.data.name is string
-        && request.resource.data.name.size() > 0
-        && request.resource.data.name.size() <= 120
         && request.resource.data.plant is string
         && request.resource.data.plant.size() > 0
         && request.resource.data.plant.size() <= 100
@@ -28,11 +25,17 @@ service cloud.firestore {
         && request.resource.data.assetNumber is string
         && request.resource.data.assetNumber.size() > 0
         && request.resource.data.assetNumber.size() <= 60
-        && request.resource.data.description is string
-        && request.resource.data.description.size() > 0
-        && request.resource.data.description.size() <= 1000
+        && (!('name' in request.resource.data)
+          || (request.resource.data.name is string
+            && request.resource.data.name.size() > 0
+            && request.resource.data.name.size() <= 120))
+        && (!('description' in request.resource.data)
+          || (request.resource.data.description is string
+            && request.resource.data.description.size() > 0
+            && request.resource.data.description.size() <= 1000))
         && (!('routineTemplateId' in request.resource.data)
           || (request.resource.data.routineTemplateId is string
+            && request.resource.data.routineTemplateId.size() > 0
             && request.resource.data.routineTemplateId.size() <= 128));
     }
 
