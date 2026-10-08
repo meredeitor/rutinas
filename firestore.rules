@@ -14,7 +14,7 @@ service cloud.firestore {
 
     function validMachine() {
       return request.resource.data.keys().hasOnly([
-          'name', 'plant', 'department', 'assetNumber', 'description'
+          'name', 'plant', 'department', 'assetNumber', 'description', 'routineTemplateId'
         ])
         && request.resource.data.name is string
         && request.resource.data.name.size() > 0
@@ -30,7 +30,22 @@ service cloud.firestore {
         && request.resource.data.assetNumber.size() <= 60
         && request.resource.data.description is string
         && request.resource.data.description.size() > 0
-        && request.resource.data.description.size() <= 1000;
+        && request.resource.data.description.size() <= 1000
+        && (!('routineTemplateId' in request.resource.data)
+          || (request.resource.data.routineTemplateId is string
+            && request.resource.data.routineTemplateId.size() <= 128));
+    }
+
+    function validTemplate() {
+      return request.resource.data.keys().hasOnly([
+          'name', 'description', 'createdAt', 'updatedAt'
+        ])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.name.size() <= 120
+        && request.resource.data.description is string
+        && request.resource.data.description.size() > 0
+        && request.resource.data.description.size() <= 500;
     }
 
     function validRoutine() {
@@ -104,6 +119,25 @@ service cloud.firestore {
         allow delete: if isAdmin();
 
         // Fotografía de referencia de una actividad.
+        match /images/{imageId} {
+          allow read: if true;
+          allow create, update: if isAdmin() && validImage();
+          allow delete: if isAdmin();
+        }
+      }
+    }
+
+    // Plantillas maestras compartidas por varias máquinas.
+    match /routineTemplates/{templateId} {
+      allow read: if true;
+      allow create, update: if isAdmin() && validTemplate();
+      allow delete: if isAdmin();
+
+      match /routines/{routineId} {
+        allow read: if true;
+        allow create, update: if isAdmin() && validRoutine();
+        allow delete: if isAdmin();
+
         match /images/{imageId} {
           allow read: if true;
           allow create, update: if isAdmin() && validImage();
