@@ -9,6 +9,7 @@ const db = getFirestore(app);
 const $ = (selector, scope = document) => scope.querySelector(selector);
 const $$ = (selector, scope = document) => [...scope.querySelectorAll(selector)];
 const state = { user: null, admin: false, adminName: '', browsing: false, machines: [], templates: [], objectUrls: [], auditBatch: null };
+let routinePreviewUrl = '';
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 $$('[data-app-version]').forEach(element => { element.textContent = window.APP_VERSION; });
 
@@ -385,12 +386,20 @@ function machineModal(machine = {}) {
 function routineModal(owner, routine = {}) {
   const form = $('#routineForm');
   form.reset();
+  resetRoutinePhotoPreview();
   for (const field of ['activityType', 'activity', 'frequency', 'order', 'material', 'ppe', 'waste']) form.elements[field].value = routine[field] ?? (field === 'activityType' ? 'General' : field === 'frequency' ? 'Diaria' : field === 'order' ? 1 : '');
   form.elements.machineId.value = owner.id;
   form.elements.ownerType.value = owner.type;
   form.elements.routineId.value = routine.id || '';
   $('#routineDialogTitle').textContent = routine.id ? 'Editar actividad' : 'Agregar actividad';
   $('#routineDialog').showModal();
+}
+function resetRoutinePhotoPreview() {
+  if (routinePreviewUrl) URL.revokeObjectURL(routinePreviewUrl);
+  routinePreviewUrl = '';
+  $('#routinePhotoPreview').hidden = true;
+  $('#routinePhotoPreviewImage').removeAttribute('src');
+  $('#routinePhotoPreviewName').textContent = '';
 }
 async function optimize(file) {
   if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw Error('Selecciona una imagen PNG, JPG o WebP.');
@@ -754,6 +763,16 @@ async function render() {
 $('#userAccess').onclick = () => { state.browsing = true; showApp(); };
 $('#adminAccess').onclick = () => $('#loginDialog').showModal();
 $$('[data-close]').forEach(button => button.onclick = () => button.closest('dialog').close());
+$('#routinePhotoInput').onchange = event => {
+  resetRoutinePhotoPreview();
+  const file = event.currentTarget.files[0];
+  if (!file) return;
+  routinePreviewUrl = URL.createObjectURL(file);
+  $('#routinePhotoPreviewImage').src = routinePreviewUrl;
+  $('#routinePhotoPreviewName').textContent = file.name;
+  $('#routinePhotoPreview').hidden = false;
+};
+$('#removeRoutinePhoto').onclick = event => { event.preventDefault(); event.stopPropagation(); $('#routinePhotoInput').value = ''; resetRoutinePhotoPreview(); };
 $('#loginForm').onsubmit = async event => {
   event.preventDefault();
   const button = $('button[type="submit"]', event.currentTarget);
