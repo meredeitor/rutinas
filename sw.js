@@ -1,6 +1,6 @@
 importScripts('./js/version.js');
 const CACHE = `rutinas-v${self.APP_VERSION}`;
-const ASSETS = ['./', './index.html', './css/styles.css?v=1.5.6', './css/machine-photo.css?v=1.5.6', './css/qr-stickers.css?v=1.5.6', './css/audits.css?v=1.5.6', './css/access-control-theme.css?v=1.5.6', './js/app.js?v=1.5.6', './js/firebase-config.js', './js/version.js?v=1.5.6', './js/theme.js?v=1.5.6', './manifest.webmanifest', './icons/icon.svg?v=1.5.6'];
+const ASSETS = ['./', './index.html', './css/styles.css?v=1.5.7', './css/machine-photo.css?v=1.5.7', './css/qr-stickers.css?v=1.5.7', './css/audits.css?v=1.5.7', './css/access-control-theme.css?v=1.5.7', './js/app.js?v=1.5.7', './js/firebase-config.js', './js/version.js?v=1.5.7', './js/theme.js?v=1.5.7', './manifest.webmanifest', './icons/icon.svg?v=1.5.7'];
 self.addEventListener('install', event => event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS))));
 self.addEventListener('activate', event => event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE).map(key => caches.delete(key))))));
 self.addEventListener('fetch', event => {

@@ -383,7 +383,7 @@ function machineModal(machine = {}) {
   $('#machineDialogTitle').textContent = machine.id ? 'Editar máquina física' : 'Agregar máquina física';
   $('#machineDialog').showModal();
 }
-function routineModal(owner, routine = {}) {
+async function routineModal(owner, routine = {}) {
   const form = $('#routineForm');
   form.reset();
   resetRoutinePhotoPreview();
@@ -393,6 +393,22 @@ function routineModal(owner, routine = {}) {
   form.elements.routineId.value = routine.id || '';
   $('#routineDialogTitle').textContent = routine.id ? 'Editar actividad' : 'Agregar actividad';
   $('#routineDialog').showModal();
+  if (routine.id) {
+    try {
+      const snapshot = await getDoc(routineImagePath(owner, routine.id));
+      if (snapshot.exists()) {
+        const data = snapshot.data();
+        routinePreviewUrl = URL.createObjectURL(new Blob([data.file.toUint8Array()], { type: data.mimeType || 'image/webp' }));
+        showRoutinePhotoPreview(routinePreviewUrl, data.fileName || 'Foto de referencia guardada.webp', false);
+      }
+    } catch (error) { console.warn('No se pudo cargar la vista previa guardada.', error); }
+  }
+}
+function showRoutinePhotoPreview(url, name, removable = true) {
+  $('#routinePhotoPreviewImage').src = url;
+  $('#routinePhotoPreviewName').textContent = name;
+  $('#removeRoutinePhoto').hidden = !removable;
+  $('#routinePhotoPreview').hidden = false;
 }
 function resetRoutinePhotoPreview() {
   if (routinePreviewUrl) URL.revokeObjectURL(routinePreviewUrl);
@@ -400,6 +416,7 @@ function resetRoutinePhotoPreview() {
   $('#routinePhotoPreview').hidden = true;
   $('#routinePhotoPreviewImage').removeAttribute('src');
   $('#routinePhotoPreviewName').textContent = '';
+  $('#removeRoutinePhoto').hidden = false;
 }
 async function optimize(file) {
   if (!['image/png', 'image/jpeg', 'image/webp'].includes(file.type)) throw Error('Selecciona una imagen PNG, JPG o WebP.');
@@ -422,7 +439,7 @@ async function optimize(file) {
 async function savePhoto(path, file) {
   if (!file?.size) return;
   const image = await optimize(file);
-  await setDoc(doc(db, ...path), { file: Bytes.fromUint8Array(new Uint8Array(await image.arrayBuffer())), mimeType: 'image/webp', updatedAt: serverTimestamp() });
+  await setDoc(doc(db, ...path), { file: Bytes.fromUint8Array(new Uint8Array(await image.arrayBuffer())), fileName: file.name || 'imagen.webp', mimeType: 'image/webp', updatedAt: serverTimestamp() });
 }
 async function saveResultEvidence(reference, file) {
   if (!file?.size) return;
@@ -768,9 +785,7 @@ $('#routinePhotoInput').onchange = event => {
   const file = event.currentTarget.files[0];
   if (!file) return;
   routinePreviewUrl = URL.createObjectURL(file);
-  $('#routinePhotoPreviewImage').src = routinePreviewUrl;
-  $('#routinePhotoPreviewName').textContent = file.name;
-  $('#routinePhotoPreview').hidden = false;
+  showRoutinePhotoPreview(routinePreviewUrl, file.name);
 };
 $('#removeRoutinePhoto').onclick = event => { event.preventDefault(); event.stopPropagation(); $('#routinePhotoInput').value = ''; resetRoutinePhotoPreview(); };
 $('#loginForm').onsubmit = async event => {
