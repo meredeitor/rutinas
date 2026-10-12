@@ -392,16 +392,24 @@ async function routineModal(owner, routine = {}) {
   form.elements.ownerType.value = owner.type;
   form.elements.routineId.value = routine.id || '';
   $('#routineDialogTitle').textContent = routine.id ? 'Editar actividad' : 'Agregar actividad';
+  $('#routinePhotoStatus').textContent = routine.id ? 'Comprobando foto guardada…' : 'Esta actividad todavía no tiene una foto guardada.';
+  $('#routinePhotoStatus').className = 'file-status';
   $('#routineDialog').showModal();
   if (routine.id) {
     try {
-      const snapshot = await getDoc(routineImagePath(owner, routine.id));
+      const snapshot = await getDoc(doc(db, ...routineImagePath(owner, routine.id)));
       if (snapshot.exists()) {
         const data = snapshot.data();
         routinePreviewUrl = URL.createObjectURL(new Blob([data.file.toUint8Array()], { type: data.mimeType || 'image/webp' }));
         showRoutinePhotoPreview(routinePreviewUrl, data.fileName || 'Foto de referencia guardada.webp', false);
-      }
-    } catch (error) { console.warn('No se pudo cargar la vista previa guardada.', error); }
+        $('#routinePhotoStatus').textContent = '✓ Foto guardada correctamente';
+        $('#routinePhotoStatus').className = 'file-status success';
+      } else $('#routinePhotoStatus').textContent = 'Esta actividad no tiene una foto guardada.';
+    } catch (error) {
+      $('#routinePhotoStatus').textContent = 'No se pudo comprobar la foto guardada.';
+      $('#routinePhotoStatus').className = 'file-status error';
+      console.warn('No se pudo cargar la vista previa guardada.', error);
+    }
   }
 }
 function showRoutinePhotoPreview(url, name, removable = true) {
@@ -786,8 +794,10 @@ $('#routinePhotoInput').onchange = event => {
   if (!file) return;
   routinePreviewUrl = URL.createObjectURL(file);
   showRoutinePhotoPreview(routinePreviewUrl, file.name);
+  $('#routinePhotoStatus').textContent = '✓ Imagen seleccionada; se guardará al pulsar Guardar actividad';
+  $('#routinePhotoStatus').className = 'file-status success';
 };
-$('#removeRoutinePhoto').onclick = event => { event.preventDefault(); event.stopPropagation(); $('#routinePhotoInput').value = ''; resetRoutinePhotoPreview(); };
+$('#removeRoutinePhoto').onclick = event => { event.preventDefault(); event.stopPropagation(); $('#routinePhotoInput').value = ''; resetRoutinePhotoPreview(); $('#routinePhotoStatus').textContent = 'Selección quitada; no se reemplazará la foto guardada.'; $('#routinePhotoStatus').className = 'file-status'; };
 $('#loginForm').onsubmit = async event => {
   event.preventDefault();
   const button = $('button[type="submit"]', event.currentTarget);
