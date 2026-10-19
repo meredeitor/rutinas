@@ -1,3 +1,3 @@
 (function (scope) {
-  scope.APP_VERSION = '1.5.8';
+  scope.APP_VERSION = '1.6.0';
 })(typeof self !== 'undefined' ? self : window);

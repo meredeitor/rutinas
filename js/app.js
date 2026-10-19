@@ -8,7 +8,7 @@ const auth = getAuth(app);
 const db = getFirestore(app);
 const $ = (selector, scope = document) => scope.querySelector(selector);
 const $$ = (selector, scope = document) => [...scope.querySelectorAll(selector)];
-const state = { user: null, admin: false, adminName: '', browsing: false, machines: [], templates: [], objectUrls: [], auditBatch: null };
+const state = { user: null, admin: false, adminName: '', browsing: false, machines: [], templates: [], catalogActivities: [], objectUrls: [], auditBatch: null };
 let routinePreviewUrl = '';
 const esc = value => String(value ?? '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' })[char]);
 $$('[data-app-version]').forEach(element => { element.textContent = window.APP_VERSION; });
@@ -96,6 +96,10 @@ async function loadTemplates() {
   const snapshot = await getDocs(query(collection(db, 'routineTemplates'), orderBy('name')));
   state.templates = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
 }
+async function loadActivityCatalog() {
+  const snapshot = await getDocs(query(collection(db, 'activityCatalog'), orderBy('activity')));
+  state.catalogActivities = snapshot.docs.map(item => ({ id: item.id, ...item.data() }));
+}
 function routineOwner(machine) {
   return machine?.routineTemplateId
     ? { type: 'template', id: machine.routineTemplateId }
@@ -154,6 +158,7 @@ function adminMenu() {
   const cards = [
     { href: '#/admin', icon: '⚙', tone: 'blue', title: 'Administrar máquinas', text: 'Máquinas, fotografías y actividades' },
     { href: '#/plantillas', icon: '≡', tone: 'purple', title: 'Plantillas de rutina', text: 'Una rutina maestra para varias máquinas' },
+    { href: '#/catalogo-actividades', icon: '☷', tone: 'amber', title: 'Catálogo de actividades', text: 'Actividades reutilizables sin fotografía' },
     { href: '#/auditorias', icon: '✓', tone: 'mint', title: 'Auditorías', text: 'Evaluaciones, hallazgos y seguimiento' },
     { href: '#/qr', icon: '▣', tone: 'amber', title: 'Códigos QR', text: 'Selecciona, prepara e imprime tarjetas' },
     { href: '#/help', icon: '?', tone: 'purple', title: 'Ayuda', text: 'Guía completa y versión de la aplicación' }
@@ -285,6 +290,60 @@ function templateModal(template = {}) {
   $('#templateDialogTitle').textContent = template.id ? 'Editar plantilla' : 'Nueva plantilla';
   $('#templateDialog').showModal();
 }
+function catalogFilterMarkup() {
+  const types = [...new Set(state.catalogActivities.map(item => item.activityType || 'General'))].sort((a, b) => a.localeCompare(b, 'es-MX'));
+  return `<div class="catalog-filters"><label><span>Buscar actividad</span><input id="catalogSearch" type="search" placeholder="Actividad, material o EPP…" autocomplete="off"></label><label><span>Tipo de actividad</span><select id="catalogTypeFilter"><option value="">Todos los tipos</option>${types.map(type => `<option value="${esc(type)}">${esc(type)}</option>`).join('')}</select></label><button id="clearCatalogFilters" class="button secondary compact" type="button">Limpiar filtros</button></div><p id="catalogFilterCount" class="filter-count"></p>`;
+}
+function bindCatalogFilters(cardSelector) {
+  const cards = $$(cardSelector);
+  const search = $('#catalogSearch');
+  const type = $('#catalogTypeFilter');
+  const apply = () => {
+    const term = normalized(search.value);
+    const selectedType = normalized(type.value);
+    let visible = 0;
+    cards.forEach(card => {
+      const matches = (!term || normalized(card.dataset.search).includes(term)) && (!selectedType || normalized(card.dataset.type) === selectedType);
+      card.hidden = !matches;
+      if (matches) visible += 1;
+    });
+    $('#catalogFilterCount').textContent = `${visible} de ${cards.length} actividad${cards.length === 1 ? '' : 'es'}`;
+    const empty = $('#catalogFilterEmpty');
+    if (empty) empty.hidden = visible !== 0;
+  };
+  search.addEventListener('input', apply);
+  type.addEventListener('change', apply);
+  $('#clearCatalogFilters').onclick = () => { search.value = ''; type.value = ''; apply(); search.focus(); };
+  apply();
+  return apply;
+}
+async function activityCatalog() {
+  await loadActivityCatalog();
+  const cards = state.catalogActivities.map(item => `<article class="admin-card catalog-activity-card" data-catalog-card data-type="${esc(item.activityType || 'General')}" data-search="${esc(`${item.activityType} ${item.activity} ${item.frequency} ${item.material} ${item.ppe} ${item.waste}`)}"><div><span class="badge">${esc(item.activityType || 'General')}</span><span class="frequency-chip">${esc(item.frequency)}</span><h3>${esc(item.activity)}</h3><p><b>Material:</b> ${esc(item.material || 'No aplica')} · <b>EPP:</b> ${esc(item.ppe || 'No aplica')}</p>${item.waste ? `<small>⚠ ${esc(item.waste)}</small>` : ''}</div><div class="template-actions"><button class="button secondary compact" data-edit-catalog="${esc(item.id)}">Editar</button><button class="button danger compact" data-delete-catalog="${esc(item.id)}">Eliminar</button></div></article>`).join('');
+  const body = `${state.catalogActivities.length ? catalogFilterMarkup() : ''}<div class="admin-grid catalog-activity-grid">${cards || '<div class="empty-state">Aún no hay actividades en el catálogo.</div>'}</div>${state.catalogActivities.length ? '<div id="catalogFilterEmpty" class="empty-state" hidden>No se encontraron actividades con esos filtros.</div>' : ''}`;
+  $('#mainContent').innerHTML = page('Catálogo de actividades', 'Biblioteca reutilizable', 'Captura una vez los datos de una actividad y agrégala a cualquier plantilla. Las fotografías se cargan desde cada rutina.', body, '<button id="newCatalogActivity" class="button primary">＋ Nueva actividad</button>');
+  if (state.catalogActivities.length) bindCatalogFilters('[data-catalog-card]');
+  $('#newCatalogActivity').onclick = () => catalogActivityModal();
+  $$('[data-edit-catalog]').forEach(button => button.onclick = () => catalogActivityModal(state.catalogActivities.find(item => item.id === button.dataset.editCatalog)));
+  $$('[data-delete-catalog]').forEach(button => button.onclick = () => deleteCatalogActivity(state.catalogActivities.find(item => item.id === button.dataset.deleteCatalog), button));
+}
+function catalogActivityModal(item = {}) {
+  const form = $('#catalogActivityForm');
+  form.reset();
+  form.elements.catalogActivityId.value = item.id || '';
+  for (const field of ['activityType', 'activity', 'frequency', 'material', 'ppe', 'waste']) form.elements[field].value = item[field] ?? (field === 'activityType' ? 'General' : field === 'frequency' ? 'Diaria' : '');
+  $('#catalogActivityDialogTitle').textContent = item.id ? 'Editar actividad del catálogo' : 'Nueva actividad del catálogo';
+  $('#catalogActivityDialog').showModal();
+}
+async function deleteCatalogActivity(item, button) {
+  if (!item || !confirm(`¿Eliminar "${item.activity}" del catálogo? Las actividades ya copiadas a rutinas no se modificarán.`)) return;
+  busy(button, true, 'Eliminando…');
+  try {
+    await deleteDoc(doc(db, 'activityCatalog', item.id));
+    await activityCatalog();
+    toast('Actividad eliminada del catálogo.');
+  } catch (error) { toast(`No se pudo eliminar: ${error.message}`, 'error'); busy(button, false); }
+}
 async function templateRoutines(templateId) {
   await loadTemplates();
   const template = state.templates.find(item => item.id === templateId);
@@ -292,7 +351,7 @@ async function templateRoutines(templateId) {
   const owner = { type: 'template', id: template.id };
   const routines = await loadRoutines(owner);
   const cards = routines.map(item => `<article class="list-card"><div><span class="badge">${esc(item.activityType || 'General')}</span><h3>${esc(item.activity)}</h3><p>${esc(item.frequency)} · ${esc(item.material || 'Sin material')}</p></div><div><small>Orden</small><p>${Number(item.order) || 1}</p></div><div class="list-actions"><button class="button secondary compact" data-edit-template-routine="${esc(item.id)}">Editar</button><button class="button danger compact" data-delete-template-routine="${esc(item.id)}">Eliminar</button></div></article>`).join('');
-  $('#mainContent').innerHTML = page(template.name, 'Plantilla maestra', template.description || 'Las modificaciones se reflejan en todas las máquinas asignadas.', `<div class="template-notice">Los cambios realizados aquí se aplican automáticamente a todas las máquinas vinculadas.</div><div class="card-list">${cards || '<div class="empty-state">Esta plantilla todavía no tiene actividades.</div>'}</div>`, '<button id="newTemplateRoutine" class="button primary">＋ Agregar actividad</button><a class="button secondary" href="#/plantilla-asignar/' + encodeURIComponent(template.id) + '">Asignar máquinas</a><a class="button secondary" href="#/plantillas">Volver</a>');
+  $('#mainContent').innerHTML = page(template.name, 'Plantilla maestra', template.description || 'Las modificaciones se reflejan en todas las máquinas asignadas.', `<div class="template-notice">Los cambios realizados aquí se aplican automáticamente a todas las máquinas vinculadas.</div><div class="card-list">${cards || '<div class="empty-state">Esta plantilla todavía no tiene actividades.</div>'}</div>`, '<button id="newTemplateRoutine" class="button primary">＋ Nueva actividad</button><a class="button secondary" href="#/plantilla-catalogo/' + encodeURIComponent(template.id) + '">☷ Agregar desde catálogo</a><a class="button secondary" href="#/plantilla-asignar/' + encodeURIComponent(template.id) + '">Asignar máquinas</a><a class="button secondary" href="#/plantillas">Volver</a>');
   $('#newTemplateRoutine').onclick = () => routineModal(owner);
   $$('[data-edit-template-routine]').forEach(button => button.onclick = () => routineModal(owner, routines.find(item => item.id === button.dataset.editTemplateRoutine)));
   $$('[data-delete-template-routine]').forEach(button => button.onclick = async () => {
@@ -302,6 +361,35 @@ async function templateRoutines(templateId) {
     await deleteDoc(routineDoc(owner, button.dataset.deleteTemplateRoutine));
     await templateRoutines(template.id);
   });
+}
+async function addCatalogActivities(templateId) {
+  await Promise.all([loadTemplates(), loadActivityCatalog()]);
+  const template = state.templates.find(item => item.id === templateId);
+  if (!template) { location.hash = '#/plantillas'; return; }
+  const owner = { type: 'template', id: template.id };
+  const routines = await loadRoutines(owner);
+  const cards = state.catalogActivities.map(item => `<label class="qr-select-card catalog-select-card" data-catalog-select-card data-type="${esc(item.activityType || 'General')}" data-search="${esc(`${item.activityType} ${item.activity} ${item.frequency} ${item.material} ${item.ppe} ${item.waste}`)}"><input type="checkbox" value="${esc(item.id)}" data-catalog-select><span class="qr-select-check">✓</span><div><span class="badge">${esc(item.activityType || 'General')}</span><h3>${esc(item.activity)}</h3><p>${esc(item.frequency)} · ${esc(item.material || 'Sin material')}</p></div></label>`).join('');
+  const body = state.catalogActivities.length ? `${catalogFilterMarkup()}<div class="audit-selection-actions"><button id="selectVisibleCatalog" class="button secondary" type="button">Seleccionar visibles</button><button id="clearCatalogSelection" class="button secondary" type="button">Quitar selección</button></div><div class="qr-select-grid">${cards}</div><div id="catalogFilterEmpty" class="empty-state" hidden>No se encontraron actividades con esos filtros.</div>` : '<div class="empty-state">El catálogo está vacío. Primero registra actividades.</div>';
+  $('#mainContent').innerHTML = page(`Agregar a ${template.name}`, 'Catálogo de actividades', 'Selecciona una o varias actividades. Se copiarán como registros independientes y después podrás agregar su fotografía.', body, state.catalogActivities.length ? '<button id="copyCatalogActivities" class="button primary" disabled>Agregar seleccionadas</button><a class="button secondary" href="#/plantilla/' + encodeURIComponent(template.id) + '">Cancelar</a>' : '<a class="button primary" href="#/catalogo-actividades">Ir al catálogo</a><a class="button secondary" href="#/plantilla/' + encodeURIComponent(template.id) + '">Volver</a>');
+  if (!state.catalogActivities.length) return;
+  bindCatalogFilters('[data-catalog-select-card]');
+  const selections = $$('[data-catalog-select]');
+  const updateCount = () => { const count = selections.filter(item => item.checked).length; $('#copyCatalogActivities').disabled = count === 0; $('#copyCatalogActivities').textContent = count ? `Agregar seleccionadas (${count})` : 'Agregar seleccionadas'; };
+  selections.forEach(item => item.onchange = updateCount);
+  $('#selectVisibleCatalog').onclick = () => { selections.forEach(item => { if (!item.closest('[data-catalog-select-card]').hidden) item.checked = true; }); updateCount(); };
+  $('#clearCatalogSelection').onclick = () => { selections.forEach(item => { item.checked = false; }); updateCount(); };
+  $('#copyCatalogActivities').onclick = async () => {
+    const button = $('#copyCatalogActivities');
+    const selected = selections.filter(item => item.checked).map(input => state.catalogActivities.find(item => item.id === input.value)).filter(Boolean);
+    busy(button, true, 'Agregando…');
+    try {
+      let order = routines.reduce((highest, item) => Math.max(highest, Number(item.order) || 0), 0);
+      for (const item of selected) await addDoc(routineCollection(owner), { activityType: item.activityType, activity: item.activity, frequency: item.frequency, order: ++order, material: item.material || '', ppe: item.ppe || '', waste: item.waste || '', createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+      toast(`${selected.length} actividad${selected.length === 1 ? '' : 'es'} agregada${selected.length === 1 ? '' : 's'} a la plantilla.`);
+      location.hash = `#/plantilla/${encodeURIComponent(template.id)}`;
+    } catch (error) { toast(`No se pudieron agregar: ${error.message}`, 'error'); busy(button, false); }
+  };
+  updateCount();
 }
 async function assignTemplate(templateId) {
   await Promise.all([loadMachines(), loadTemplates()]);
@@ -746,7 +834,7 @@ function help() {
   <details open><summary><span>01</span><div><strong>Acceso y perfiles</strong><small>Operadores y administradores</small></div></summary><ol><li>En la pantalla inicial, pulsa <b>Consultar rutina</b> para entrar como operador sin iniciar sesión.</li><li>Pulsa <b>Acceso administrador</b> para gestionar máquinas, actividades, QR y auditorías.</li><li>Escribe el correo y contraseña registrados en Firebase Authentication.</li><li>La cuenta debe tener un documento en <code>usuarios/{uid}</code> con <code>rol: admin</code> y <code>estatus: activo</code>.</li><li>Si el perfil contiene el campo <code>nombre</code>, se mostrará en la bienvenida y en los reportes; de lo contrario se mostrará el correo.</li><li>Usa el botón de salida ubicado arriba a la derecha para cerrar la sesión de forma segura.</li></ol></details>
   <details><summary><span>02</span><div><strong>Administrar máquinas</strong><small>Alta, edición y eliminación</small></div></summary><ol><li>Primero crea por lo menos una plantilla de rutina.</li><li>Abre <b>Administrar máquinas</b> y pulsa <b>Agregar máquina</b>.</li><li>Selecciona la plantilla y captura únicamente Planta, Departamento, No. de Activo y Foto.</li><li>El nombre, descripción y actividades se obtienen automáticamente de la plantilla para evitar doble captura.</li><li>La foto se convierte automáticamente a WebP y se reduce a un máximo de 180 KB.</li><li>Pulsa <b>Editar</b> para cambiar la ubicación, activo, fotografía o plantilla asignada.</li><li>Pulsa <b>Eliminar</b> para borrar la máquina física y su fotografía. La plantilla compartida no se elimina.</li></ol></details>
   <details><summary><span>03</span><div><strong>Plantillas de rutina</strong><small>Una rutina para varias máquinas</small></div></summary><ol><li>Abre <b>Plantillas de rutina</b> desde el menú administrativo.</li><li>Crea una plantilla y captura una sola vez el nombre o modelo y la descripción general de la máquina.</li><li>Agrega o edita las actividades de la plantilla. Los cambios se reflejan automáticamente en todas las máquinas vinculadas.</li><li>Pulsa <b>Asignar máquinas</b>, usa el buscador y los filtros, selecciona las máquinas compatibles y guarda la asignación.</li><li>También puedes convertir una rutina independiente existente en plantilla.</li><li>Las tarjetas, QR y auditorías combinan nombre y descripción de la plantilla con planta, departamento, activo y foto de cada máquina física.</li><li>Una plantilla no se puede eliminar mientras tenga máquinas vinculadas.</li></ol></details>
-  <details><summary><span>04</span><div><strong>Actividades de mantenimiento</strong><small>Construcción de la rutina</small></div></summary><ol><li>En una máquina independiente o plantilla, pulsa <b>Actividades</b>.</li><li>Agrega el Tipo de actividad, por ejemplo Limpieza, Lubricación, Inspección, Ajuste o Conservación. También puedes escribir otro tipo.</li><li>Captura la descripción de la actividad, Frecuencia, Orden, Material, Equipo de protección y Residuos / advertencia.</li><li>Agrega una fotografía de referencia cuando ayude al operador a identificar el punto de trabajo.</li><li>Usa el Orden para establecer la secuencia de los pasos.</li><li>Edita o elimina actividades desde la misma pantalla.</li><li>En la rutina del operador, las actividades se agrupan automáticamente en contenedores por Tipo de actividad.</li><li>Los registros antiguos sin tipo aparecen en el grupo <b>General</b> hasta que sean editados.</li></ol></details>
+  <details><summary><span>04</span><div><strong>Catálogo y actividades</strong><small>Biblioteca y construcción de la rutina</small></div></summary><ol><li>Abre <b>Catálogo de actividades</b> para crear actividades reutilizables sin fotografía.</li><li>Captura Tipo, Actividad, Frecuencia, Material, Equipo de protección y Residuos / advertencia.</li><li>Usa el buscador y el filtro por tipo para localizar, editar o eliminar elementos del catálogo.</li><li>Abre una plantilla y pulsa <b>Agregar desde catálogo</b>.</li><li>Selecciona una o varias actividades y pulsa <b>Agregar seleccionadas</b>. Se copiarán a la plantilla con un orden consecutivo.</li><li>La copia queda independiente: cambiar o eliminar el catálogo no modifica las rutinas existentes.</li><li>Edita la actividad dentro de la plantilla para ajustar sus datos y cargar su fotografía de referencia particular.</li><li>También puedes usar <b>Nueva actividad</b> para capturarla manualmente sin pasar por el catálogo.</li><li>En la rutina del operador, las actividades se agrupan automáticamente en contenedores por Tipo de actividad.</li></ol></details>
   <details><summary><span>05</span><div><strong>Consulta de rutina</strong><small>Uso del operador</small></div></summary><ol><li>El operador puede escanear el QR colocado en la máquina o entrar por <b>Consultar rutina</b>.</li><li>Si entra manualmente, selecciona la tarjeta de la máquina y pulsa <b>Ver rutina</b>.</li><li>Consulta los grupos de actividades y sigue los pasos en el orden indicado.</li><li>Cada actividad muestra frecuencia, material, equipo de protección, residuos o advertencias y fotografía de referencia.</li><li>El QR abre directamente la máquina correspondiente sin solicitar inicio de sesión.</li></ol></details>
   <details><summary><span>05</span><div><strong>Códigos QR e impresión</strong><small>Tarjetas para las máquinas</small></div></summary><ol><li>Abre <b>Códigos QR</b> desde el menú administrativo.</li><li>Busca una máquina o filtra por Planta y Departamento.</li><li>Marca una o varias máquinas. <b>Seleccionar visibles</b> marca solamente los resultados mostrados por los filtros.</li><li>Pulsa <b>Preparar impresión</b> para generar una tarjeta diferente por máquina.</li><li>Revisa la vista previa y pulsa <b>Imprimir tarjetas</b>.</li><li>La impresión acomoda hasta cuatro tarjetas por hoja A4, en una cuadrícula de 2 × 2. Las tarjetas adicionales continúan en páginas nuevas.</li><li>Pulsa <b>Volver a seleccionar</b> para modificar el conjunto antes de imprimir.</li></ol></details>
   <details><summary><span>06</span><div><strong>Auditorías semanales</strong><small>Evaluación de varias máquinas</small></div></summary><ol><li>Abre <b>Auditorías</b> y pulsa <b>Nueva auditoría</b>.</li><li>Selecciona Semana y Fecha de auditoría.</li><li>Busca y filtra las máquinas por Planta o Departamento.</li><li>Marca todas las máquinas de la jornada o utiliza <b>Seleccionar visibles</b>. También puedes quitar toda la selección.</li><li>Pulsa <b>Iniciar auditoría</b>. La aplicación presentará las máquinas una por una.</li><li>Las máquinas sin actividades serán omitidas y la aplicación continuará con la siguiente.</li><li>Evalúa cada actividad como <b>Cumple</b>, <b>No cumple</b> o <b>No aplica</b>.</li><li>La barra superior indica cuántas actividades faltan por evaluar.</li><li>Pulsa <b>Guardar y continuar</b> para registrar la máquina y avanzar a la siguiente.</li><li>Las máquinas seleccionadas juntas se agrupan en el historial como una misma Jornada de auditoría, pero conservan resultados y reportes independientes.</li></ol></details>
@@ -762,14 +850,16 @@ async function render() {
   const current = route();
   if (current.page === 'rutina' && current.id && !state.browsing && !state.admin) { state.browsing = true; showApp(); return; }
   if (!state.browsing && !state.admin) { showAccess(); return; }
-  if (['admin', 'plantillas', 'plantilla', 'plantilla-asignar', 'qr', 'auditorias', 'auditoria', 'auditoria-editar', 'auditoria-nueva'].includes(current.page) && !state.admin) { showAccess(); return; }
+  if (['admin', 'plantillas', 'plantilla', 'plantilla-asignar', 'plantilla-catalogo', 'catalogo-actividades', 'qr', 'auditorias', 'auditoria', 'auditoria-editar', 'auditoria-nueva'].includes(current.page) && !state.admin) { showAccess(); return; }
   try {
     if (current.page === 'rutina' && current.id) await routine(decodeURIComponent(current.id));
     else if (current.page === 'menu' && state.admin) adminMenu();
     else if (current.page === 'admin') await admin();
     else if (current.page === 'plantillas') await templates();
+    else if (current.page === 'catalogo-actividades') await activityCatalog();
     else if (current.page === 'plantilla' && current.id) await templateRoutines(decodeURIComponent(current.id));
     else if (current.page === 'plantilla-asignar' && current.id) await assignTemplate(decodeURIComponent(current.id));
+    else if (current.page === 'plantilla-catalogo' && current.id) await addCatalogActivities(decodeURIComponent(current.id));
     else if (current.page === 'auditorias') await audits();
     else if (current.page === 'auditoria-nueva') await newAudit();
     else if (current.page === 'auditoria' && current.id) await auditDetail(decodeURIComponent(current.id));
@@ -857,6 +947,22 @@ $('#templateForm').onsubmit = async event => {
     await templates();
     toast(id ? 'Plantilla actualizada.' : 'Plantilla creada.');
   } catch (error) { toast(`No se pudo guardar la plantilla: ${error.message}`, 'error'); }
+  finally { busy(button, false); }
+};
+$('#catalogActivityForm').onsubmit = async event => {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  const button = $('button[type="submit"]', event.currentTarget);
+  const payload = { activityType: String(form.get('activityType')).trim(), activity: String(form.get('activity')).trim(), frequency: String(form.get('frequency')), material: String(form.get('material')).trim(), ppe: String(form.get('ppe')).trim(), waste: String(form.get('waste')).trim(), updatedAt: serverTimestamp() };
+  busy(button, true, 'Guardando…');
+  try {
+    const id = String(form.get('catalogActivityId') || '');
+    if (id) await updateDoc(doc(db, 'activityCatalog', id), payload);
+    else await addDoc(collection(db, 'activityCatalog'), { ...payload, createdAt: serverTimestamp() });
+    $('#catalogActivityDialog').close();
+    await activityCatalog();
+    toast(id ? 'Actividad del catálogo actualizada.' : 'Actividad agregada al catálogo.');
+  } catch (error) { toast(`No se pudo guardar: ${error.message}`, 'error'); }
   finally { busy(button, false); }
 };
 $('#routineForm').onsubmit = async event => {
