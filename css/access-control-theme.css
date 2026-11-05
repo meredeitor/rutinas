@@ -48,6 +48,8 @@ body{background:radial-gradient(circle at 90% 0,rgba(0,112,218,.13),transparent 
 .page-heading{margin:4px 0 26px}.page-heading h2{color:#f6f9ff;letter-spacing:-.025em}.page-heading p{margin:.35rem 0 0}
 .hero{background:radial-gradient(circle at 92% 0,rgba(255,255,255,.13),transparent 30%),linear-gradient(120deg,#0b6fe4,#0848aa);box-shadow:0 22px 55px rgba(0,63,151,.28)}
 .hero p:last-child{color:#d6e9ff}
+.home-hero{min-height:140px;padding:26px 38px;border-radius:20px}.home-hero h2{margin-bottom:5px;font-size:clamp(28px,3vw,38px)}.home-hero p:last-child{margin:0;font-size:15px}.home-hero .hero-icon{font-size:66px}
+@media(max-width:600px){.home-hero{min-height:auto;padding:20px;border-radius:17px}.home-hero h2{font-size:27px}.home-hero p:last-child{font-size:14px;line-height:1.45}}
 .machine-card,.admin-card,.list-card,.info-card,.audit-batch-group,.routine-type-group{border-color:var(--line);background:#0d192b;box-shadow:0 12px 34px rgba(0,0,0,.18);color:#eef5ff}
 .machine-art{background:linear-gradient(145deg,#123968,#0a1f3a)}
 .machine-review,.machine-model,.list-card p,.list-card small{color:var(--muted)}
